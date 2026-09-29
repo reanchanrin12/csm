@@ -28,3 +28,4 @@ npm run dev:frontend
 chmod +x deploy.sh
 ./deploy.sh
 ```
+# csm
