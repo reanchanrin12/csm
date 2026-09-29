@@ -33,6 +33,7 @@ import {
   Eye,
 } from "lucide-react";
 import { salesService } from "@/lib/api";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 interface SaleOrderRow {
   id: string;
@@ -137,6 +138,19 @@ export default function SoldListPage() {
     });
   }, [sales, receiptFilter, brandFilter, modelFilter, vinFilter, dateFilter, branchFilter]);
 
+  // Table pagination state (10 items per page limit to prevent slow rendering)
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [receiptFilter, brandFilter, modelFilter, vinFilter, dateFilter, branchFilter]);
+
+  const paginatedSales = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredSales.slice(start, start + pageSize);
+  }, [filteredSales, currentPage, pageSize]);
+
   const resetFilters = () => {
     setReceiptFilter("");
     setBrandFilter("");
@@ -144,6 +158,7 @@ export default function SoldListPage() {
     setVinFilter("");
     setDateFilter("");
     setBranchFilter("all");
+    setCurrentPage(1);
   };
 
   return (
@@ -314,7 +329,7 @@ export default function SoldListPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredSales.map((sale) => {
+              paginatedSales.map((sale) => {
                 const purchaseCost = sale.purchaseCost || (sale.totalLandedCost ? sale.totalLandedCost * 0.8 : 0);
                 const tax = sale.tax || 0;
                 const clear = sale.clear || 0;
@@ -453,6 +468,14 @@ export default function SoldListPage() {
             )}
           </TableBody>
         </Table>
+
+        {/* Pagination Controls */}
+        <TablePagination
+          currentPage={currentPage}
+          totalItems={filteredSales.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );

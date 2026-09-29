@@ -33,6 +33,7 @@ import {
   DollarSign,
 } from "lucide-react";
 import { salesService } from "@/lib/api";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 interface ScheduleItem {
   id: string;
@@ -137,11 +138,25 @@ export default function CustomerLoanSchedulePage() {
     });
   }, [loans, loanCodeFilter, brandFilter, modelFilter, vinFilter]);
 
+  // Pagination (10 items per page limit to prevent slow rendering)
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [loanCodeFilter, brandFilter, modelFilter, vinFilter]);
+
+  const paginatedLoans = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredLoans.slice(start, start + pageSize);
+  }, [filteredLoans, currentPage, pageSize]);
+
   const resetFilters = () => {
     setLoanCodeFilter("");
     setBrandFilter("");
     setModelFilter("");
     setVinFilter("");
+    setCurrentPage(1);
   };
 
   const handlePaySchedule = async (scheduleId: string) => {
@@ -328,7 +343,7 @@ export default function CustomerLoanSchedulePage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredLoans.map((loan) => (
+                paginatedLoans.map((loan) => (
                   <TableRow
                     key={loan.id}
                     className="hover:bg-muted/40 transition-colors"
@@ -396,25 +411,13 @@ export default function CustomerLoanSchedulePage() {
             </TableBody>
           </Table>
 
-          {/* Pagination Controls matching Screenshot 111258 */}
-          <div className="p-3 border-t flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled
-              className="h-8 text-xs px-3"
-            >
-              &laquo; Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled
-              className="h-8 text-xs px-3"
-            >
-              Next &raquo;
-            </Button>
-          </div>
+          {/* Pagination Controls */}
+          <TablePagination
+            currentPage={currentPage}
+            totalItems={filteredLoans.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+          />
         </div>
       </div>
 

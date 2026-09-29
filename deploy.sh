@@ -12,6 +12,7 @@ npm install
 echo "🔨 [3/5] Building contracts & backend..."
 npm run build:contracts
 cd backend
+npx prisma generate
 npx prisma migrate deploy
 npm run build
 cd ..

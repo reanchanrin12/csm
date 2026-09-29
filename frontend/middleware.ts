@@ -48,12 +48,11 @@ function decodeJwtPayload(token: string): JwtPayload | null {
  * SUPER_ADMIN has unrestricted access to all routes.
  */
 const roleAccessRules: { prefix: string; allowedRoles: string[] }[] = [
-  { prefix: "/settings", allowedRoles: ["SUPER_ADMIN", "ADMIN"] },
   { prefix: "/users", allowedRoles: ["SUPER_ADMIN", "ADMIN"] },
   { prefix: "/employees", allowedRoles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"] },
   { prefix: "/finance", allowedRoles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"] },
-  { prefix: "/logistics", allowedRoles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER"] },
-  { prefix: "/transfers", allowedRoles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER"] },
+  { prefix: "/logistics", allowedRoles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "ACCOUNTANT"] },
+  { prefix: "/transfers", allowedRoles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "SALE"] },
 ];
 
 export function middleware(request: NextRequest) {

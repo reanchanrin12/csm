@@ -128,4 +128,28 @@ export class SettingsController {
   deleteCompanyProfile(@Param('id') id: string) {
     return this.settingsService.deleteCompanyProfile(id);
   }
+
+  // Countries
+  @Get('countries')
+  getCountries() {
+    return this.settingsService.getCountries();
+  }
+
+  @Post('countries')
+  createCountry(@Body() body: { name: string }) {
+    return this.settingsService.createCountry(body);
+  }
+
+  @Patch('countries/:id')
+  updateCountry(
+    @Param('id') id: string,
+    @Body() body: { name: string },
+  ) {
+    return this.settingsService.updateCountry(id, body);
+  }
+
+  @Delete('countries/:id')
+  deleteCountry(@Param('id') id: string) {
+    return this.settingsService.deleteCountry(id);
+  }
 }

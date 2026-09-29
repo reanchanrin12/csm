@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { employeeService } from "@/lib/api";
+import { TablePagination } from "@/components/ui/table-pagination";
 import type { EmployeeRole, SalaryPaymentSummary } from "@csm/contracts";
 
 interface Employee {
@@ -51,6 +52,11 @@ export default function EmployeesPage() {
 
   // Active Tab: 'employee' (Employee info) or 'salary' (Salary payment)
   const [activeTab, setActiveTab] = useState<"employee" | "salary">("employee");
+
+  // Table pagination state (10 items per page limit to prevent slow rendering)
+  const [empPage, setEmpPage] = useState(1);
+  const [salaryPage, setSalaryPage] = useState(1);
+  const pageSize = 10;
 
   // ─────────────────────────────────────────────
   // Employee Modal State (Create & Edit)
@@ -380,33 +386,42 @@ export default function EmployeesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {employees.map((emp, index) => (
-                    <tr
-                      key={emp.id}
-                      className="border-b border-[#f1f3f5] hover:bg-[#f8f9fa] transition-colors"
-                    >
-                      <td className="py-3 px-3 text-[#6c757d]">{index + 1}</td>
-                      <td className="py-3 px-3 font-normal text-[#212529]">{emp.englishName}</td>
-                      <td className="py-3 px-3 text-[#495057] font-khmer">{emp.khmerName || ""}</td>
-                      <td className="py-3 px-3 text-[#495057]">{emp.gender || "Male"}</td>
-                      <td className="py-3 px-3 text-[#495057]">{emp.phone}</td>
-                      <td className="py-3 px-3 text-[#495057]">{emp.jobPosition || emp.role}</td>
-                      <td className="py-3 px-3 text-[#212529] font-normal">${emp.salary}</td>
-                      <td className="py-3 px-3 text-[#495057] uppercase">{emp.branchName}</td>
-                      <td className="py-3 px-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditEmployee(emp)}
-                          className="w-6 h-6 rounded bg-[#0d6efd] hover:bg-[#0b5ed7] text-white inline-flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
-                          title="Edit Employee"
-                        >
-                          <Edit className="h-3 w-3" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {employees
+                    .slice((empPage - 1) * pageSize, empPage * pageSize)
+                    .map((emp, index) => (
+                      <tr
+                        key={emp.id}
+                        className="border-b border-[#f1f3f5] hover:bg-[#f8f9fa] transition-colors"
+                      >
+                        <td className="py-3 px-3 text-[#6c757d]">{(empPage - 1) * pageSize + index + 1}</td>
+                        <td className="py-3 px-3 font-normal text-[#212529]">{emp.englishName}</td>
+                        <td className="py-3 px-3 text-[#495057] font-khmer">{emp.khmerName || ""}</td>
+                        <td className="py-3 px-3 text-[#495057]">{emp.gender || "Male"}</td>
+                        <td className="py-3 px-3 text-[#495057]">{emp.phone}</td>
+                        <td className="py-3 px-3 text-[#495057]">{emp.jobPosition || emp.role}</td>
+                        <td className="py-3 px-3 text-[#212529] font-normal">${emp.salary}</td>
+                        <td className="py-3 px-3 text-[#495057] uppercase">{emp.branchName}</td>
+                        <td className="py-3 px-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditEmployee(emp)}
+                            className="w-6 h-6 rounded bg-[#0d6efd] hover:bg-[#0b5ed7] text-white inline-flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                            title="Edit Employee"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
+
+              <TablePagination
+                currentPage={empPage}
+                totalItems={employees.length}
+                pageSize={pageSize}
+                onPageChange={setEmpPage}
+              />
             </div>
           )}
         </div>
@@ -447,25 +462,34 @@ export default function EmployeesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {salaryPayments.map((sp, idx) => (
-                    <tr
-                      key={sp.id}
-                      className="border-b border-[#f1f3f5] hover:bg-[#f8f9fa] transition-colors"
-                    >
-                      <td className="py-3 px-3 text-[#6c757d]">{idx + 1}</td>
-                      <td className="py-3 px-3 font-normal text-[#212529]">
-                        {sp.employeeName} {sp.employeeKhmerName ? `(${sp.employeeKhmerName})` : ""}
-                      </td>
-                      <td className="py-3 px-3 text-[#495057]">{sp.paidDate}</td>
-                      <td className="py-3 px-3 font-normal text-emerald-600">${sp.payAmount}</td>
-                      <td className="py-3 px-3 text-[#495057]">${sp.actualSalary}</td>
-                      <td className="py-3 px-3 text-[#495057] capitalize">{sp.payStatus}</td>
-                      <td className="py-3 px-3 text-[#6c757d]">{sp.description || "—"}</td>
-                      <td className="py-3 px-3 text-[#495057]">{sp.branchName || "—"}</td>
-                    </tr>
-                  ))}
+                  {salaryPayments
+                    .slice((salaryPage - 1) * pageSize, salaryPage * pageSize)
+                    .map((sp, idx) => (
+                      <tr
+                        key={sp.id}
+                        className="border-b border-[#f1f3f5] hover:bg-[#f8f9fa] transition-colors"
+                      >
+                        <td className="py-3 px-3 text-[#6c757d]">{(salaryPage - 1) * pageSize + idx + 1}</td>
+                        <td className="py-3 px-3 font-normal text-[#212529]">
+                          {sp.employeeName} {sp.employeeKhmerName ? `(${sp.employeeKhmerName})` : ""}
+                        </td>
+                        <td className="py-3 px-3 text-[#495057]">{sp.paidDate}</td>
+                        <td className="py-3 px-3 font-normal text-emerald-600">${sp.payAmount}</td>
+                        <td className="py-3 px-3 text-[#495057]">${sp.actualSalary}</td>
+                        <td className="py-3 px-3 text-[#495057] capitalize">{sp.payStatus}</td>
+                        <td className="py-3 px-3 text-[#6c757d]">{sp.description || "—"}</td>
+                        <td className="py-3 px-3 text-[#495057]">{sp.branchName || "—"}</td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
+
+              <TablePagination
+                currentPage={salaryPage}
+                totalItems={salaryPayments.length}
+                pageSize={pageSize}
+                onPageChange={setSalaryPage}
+              />
             </div>
           )}
         </div>

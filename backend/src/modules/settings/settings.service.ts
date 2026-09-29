@@ -166,4 +166,54 @@ export class SettingsService {
     if (!existing) throw new NotFoundException('Company profile not found');
     return (this.prisma.companyProfile as any).delete({ where: { id } });
   }
+
+  // ================= COUNTRIES =================
+  async getCountries() {
+    return this.prisma.$queryRawUnsafe<Array<{ id: string; name: string; createdAt: Date; updatedAt: Date }>>(
+      `SELECT * FROM "Country" ORDER BY "name" ASC;`
+    );
+  }
+
+  async createCountry(data: { name: string }) {
+    const trimmed = data.name.trim().toUpperCase();
+    if (!trimmed) throw new BadRequestException('Country name cannot be empty');
+    const existing = await this.prisma.$queryRawUnsafe<Array<{ id: string }>>(
+      `SELECT id FROM "Country" WHERE "name" = $1 LIMIT 1;`,
+      trimmed
+    );
+    if (existing.length > 0) {
+      throw new BadRequestException(`Country "${trimmed}" already exists`);
+    }
+
+    const inserted = await this.prisma.$queryRawUnsafe<Array<{ id: string; name: string }>>(
+      `INSERT INTO "Country" ("id", "name", "createdAt", "updatedAt") VALUES (gen_random_uuid()::text, $1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING *;`,
+      trimmed
+    );
+    return inserted[0];
+  }
+
+  async updateCountry(id: string, data: { name: string }) {
+    const trimmed = data.name.trim().toUpperCase();
+    if (!trimmed) throw new BadRequestException('Country name cannot be empty');
+    const updated = await this.prisma.$queryRawUnsafe<Array<{ id: string; name: string }>>(
+      `UPDATE "Country" SET "name" = $1, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = $2 RETURNING *;`,
+      trimmed,
+      id
+    );
+    if (!updated || updated.length === 0) {
+      throw new NotFoundException('Country not found');
+    }
+    return updated[0];
+  }
+
+  async deleteCountry(id: string) {
+    const deleted = await this.prisma.$queryRawUnsafe<Array<{ id: string }>>(
+      `DELETE FROM "Country" WHERE "id" = $1 RETURNING id;`,
+      id
+    );
+    if (!deleted || deleted.length === 0) {
+      throw new NotFoundException('Country not found');
+    }
+    return { success: true, id };
+  }
 }

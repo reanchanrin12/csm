@@ -6,6 +6,7 @@ import { LayoutGrid, Download, RotateCcw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { VehicleSummary } from "@csm/contracts";
 import { vehicleService } from "@/lib/api";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 export default function InventoryPage() {
   const [vehicles, setVehicles] = useState<VehicleSummary[]>([]);
@@ -50,6 +51,19 @@ export default function InventoryPage() {
       return true;
     });
   }, [vehicles, filterModel, filterVin, filterYear]);
+
+  // Table pagination state (10 items per page limit to prevent slow rendering)
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterModel, filterVin, filterYear]);
+
+  const paginatedVehicles = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredVehicles.slice(start, start + pageSize);
+  }, [filteredVehicles, currentPage, pageSize]);
 
   const formatMoney = (val?: number | null) => {
     const num = Number(val || 0);
@@ -180,6 +194,7 @@ export default function InventoryPage() {
                 setFilterModel("");
                 setFilterVin("");
                 setFilterYear("");
+                setCurrentPage(1);
               }}
               className="h-8 px-3 text-xs text-[#6c757d] hover:text-[#212529] border border-dashed border-[#ced4da] rounded-[4px] flex items-center gap-1 cursor-pointer transition-colors"
               title="Reset filters"
@@ -242,12 +257,14 @@ export default function InventoryPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredVehicles.map((v, index) => (
+              {paginatedVehicles.map((v, index) => (
                 <tr
                   key={v.id}
                   className="border-b border-[#f1f3f5] hover:bg-[#f8f9fa] transition-colors"
                 >
-                  <td className="py-3 px-3 text-[#6c757d] font-bold">{index + 1}</td>
+                  <td className="py-3 px-3 text-[#6c757d] font-bold">
+                    {(currentPage - 1) * pageSize + index + 1}
+                  </td>
                   <td className="py-3 px-3 font-semibold text-[#212529] uppercase">{v.brand}</td>
                   <td className="py-3 px-3 font-medium text-[#212529] uppercase">{v.model}</td>
                   <td className="py-3 px-3 text-[#495057] font-mono text-[11px] uppercase tracking-wider">
@@ -289,6 +306,13 @@ export default function InventoryPage() {
               ))}
             </tbody>
           </table>
+
+          <TablePagination
+            currentPage={currentPage}
+            totalItems={filteredVehicles.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+          />
         </div>
       )}
     </div>

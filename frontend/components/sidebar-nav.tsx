@@ -61,14 +61,13 @@ const csmNavSections: NavSection[] = [
       {
         name: "General setting",
         icon: Settings,
-        roles: ["SUPER_ADMIN", "ADMIN"],
         subItems: [
           { name: "Car brand", href: "/settings?tab=brands" },
           { name: "Country", href: "/settings?tab=countries" },
           { name: "Company Profile", href: "/settings?tab=profile" },
           { name: "Branch", href: "/settings?tab=branches" },
           { name: "Supplier & Customer", href: "/settings?tab=suppliers" },
-          { name: "System Users", href: "/settings?tab=users" },
+          { name: "System Users", href: "/settings?tab=users", roles: ["SUPER_ADMIN", "ADMIN"] },
         ],
       },
       {
@@ -122,13 +121,13 @@ const csmNavSections: NavSection[] = [
         name: "Tracking Shipping",
         href: "/logistics",
         icon: Truck,
-        roles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER"],
+        roles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "ACCOUNTANT"],
       },
       {
         name: "Car Transfer",
         href: "/transfers",
         icon: ArrowRightLeft,
-        roles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER"],
+        roles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "SALE"],
       },
       {
         name: "Repair",
@@ -140,7 +139,7 @@ const csmNavSections: NavSection[] = [
         name: "Employee",
         href: "/employees",
         icon: Users,
-        roles: ["SUPER_ADMIN", "ADMIN"],
+        roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"],
       },
       {
         name: "Bank loan & Payment",

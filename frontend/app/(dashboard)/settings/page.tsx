@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { settingsService, customerService } from "@/lib/api";
 import { UsersManagement } from "@/components/users-management";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 interface BranchItem {
   id: string;
@@ -283,129 +284,143 @@ function SettingsContent() {
 
   const [isAddCountryOpen, setIsAddCountryOpen] = useState(false);
   const [newCountryName, setNewCountryName] = useState("");
-  const [countries, setCountries] = useState<string[]>([
-    "BELGIUM",
-    "CAMBODIA",
-    "CANADA",
-    "CHINA",
-    "DENMARK",
-    "DUBAI",
-    "GERMANY",
-    "HONG KONG",
-    "JAPAN",
-    "LAO PDR",
-    "MALAYSIA",
-  ]);
+  const [editingCountry, setEditingCountry] = useState<{ id: string; name: string } | null>(null);
+  const [editCountryName, setEditCountryName] = useState("");
+  const [countries, setCountries] = useState<Array<{ id: string; name: string }>>([]);
 
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchAll = async () => {
+  // Table pagination state (10 items per page limit to prevent slow rendering)
+  const [brandsPage, setBrandsPage] = useState(1);
+  const [branchesPage, setBranchesPage] = useState(1);
+  const [countriesPage, setCountriesPage] = useState(1);
+  const [suppliersPage, setSuppliersPage] = useState(1);
+  const [customersPage, setCustomersPage] = useState(1);
+  const PAGE_SIZE = 10;
+
+  // Track loaded tabs to eliminate slow and repetitive network roundtrips
+  const loadedTabs = React.useRef<Set<string>>(new Set());
+
+  const fetchTabData = async (tab: string, force = false) => {
+    if (!force && loadedTabs.current.has(tab)) {
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const [branchesData, brandsData, suppliersData, profilesData, customersData] = await Promise.all([
-        settingsService.getBranches().catch(() => []),
-        settingsService.getBrands().catch(() => []),
-        settingsService.getSuppliers().catch(() => []),
-        settingsService.getCompanyProfiles().catch(() => []),
-        customerService.list().catch(() => []),
-      ]);
-      const defaultBranchList: BranchItem[] = [
-        {
-          id: "1",
-          name: "BATTAMBANG",
-          address: "#43A st National 5",
-          phone1: "069234567",
-          phone2: "",
-          note: "",
-        },
-        {
-          id: "2",
-          name: "PHNOM PENH",
-          address: "#42 st Rusia road",
-          phone1: "061 95 5555",
-          phone2: "",
-          note: "",
-        },
-        {
-          id: "7",
-          name: "BOKOR MONIVONG",
-          address: "Phnom Penh",
-          phone1: "N/A",
-          phone2: "N/A",
-          note: "",
-        },
-      ];
-      setBranches(
-        Array.isArray(branchesData) && branchesData.length > 0
-          ? (branchesData as BranchItem[])
-          : defaultBranchList
-      );
-      setBrands((brandsData as BrandItem[]) ?? []);
-      const defaultSupplierList: SupplierItem[] = [
-        {
-          id: "1",
-          nameEn: "CHINA DONG FENG MOTOR INDUSTRY IMP&EXP CO., LTD CHINA DONG FENG MOTOR INDUSTRY IMP&EXP CO., LTD",
-          nameKh: "CHINA DONG FENG MOTOR INDUSTRY",
-          category: "car_sale_supplier",
-          country: "CHINA",
-          phone: "+86-27-84301192 / +86-27-84301149",
-          job: "SUPPLIER",
-          gender: "male",
-        },
-        {
-          id: "2",
-          nameEn: "លោក ទៀ សុខា Mr.TEA SOKHA",
-          nameKh: "លោក ទៀ សុខា",
-          category: "car_sale_supplier",
-          country: "CAMBODIA",
-          phone: "N/A",
-          job: "N/A",
-          gender: "male",
-        },
-        {
-          id: "3",
-          nameEn: "លោក ម៉ែន សុខ Mr.MEN SOK",
-          nameKh: "លោក ម៉ែន សុខ",
-          category: "car_sale_supplier",
-          country: "CAMBODIA",
-          phone: "011800889",
-          job: "Customer",
-          gender: "male",
-        },
-      ];
+      if (tab === "brands") {
+        const brandsData = await settingsService.getBrands().catch(() => []);
+        setBrands((brandsData as BrandItem[]) ?? []);
+      } else if (tab === "branches") {
+        const branchesData = await settingsService.getBranches().catch(() => []);
+        const defaultBranchList: BranchItem[] = [
+          {
+            id: "1",
+            name: "BATTAMBANG",
+            address: "#43A st National 5",
+            phone1: "069234567",
+            phone2: "",
+            note: "",
+          },
+          {
+            id: "2",
+            name: "PHNOM PENH",
+            address: "#42 st Rusia road",
+            phone1: "061 95 5555",
+            phone2: "",
+            note: "",
+          },
+          {
+            id: "7",
+            name: "BOKOR MONIVONG",
+            address: "Phnom Penh",
+            phone1: "N/A",
+            phone2: "N/A",
+            note: "",
+          },
+        ];
+        setBranches(
+          Array.isArray(branchesData) && branchesData.length > 0
+            ? (branchesData as BranchItem[])
+            : defaultBranchList
+        );
+      } else if (tab === "countries") {
+        const countriesData = await settingsService.getCountries().catch(() => []);
+        if (Array.isArray(countriesData) && countriesData.length > 0) {
+          setCountries(countriesData);
+        }
+      } else if (tab === "profile" || tab === "companyprofile") {
+        const profilesData = await settingsService.getCompanyProfiles().catch(() => []);
+        if (Array.isArray(profilesData) && profilesData.length > 0) {
+          setCompanyProfiles(profilesData as CompanyProfileItem[]);
+          if (!selectedProfileId && profilesData[0]?.id) {
+            setSelectedProfileId(profilesData[0].id);
+          }
+        }
+      } else if (tab === "suppliers") {
+        const [suppliersData, customersData] = await Promise.all([
+          settingsService.getSuppliers().catch(() => []),
+          customerService.list().catch(() => []),
+        ]);
+        const defaultSupplierList: SupplierItem[] = [
+          {
+            id: "1",
+            nameEn: "CHINA DONG FENG MOTOR INDUSTRY IMP&EXP CO., LTD CHINA DONG FENG MOTOR INDUSTRY IMP&EXP CO., LTD",
+            nameKh: "CHINA DONG FENG MOTOR INDUSTRY",
+            category: "car_sale_supplier",
+            country: "CHINA",
+            phone: "+86-27-84301192 / +86-27-84301149",
+            job: "SUPPLIER",
+            gender: "male",
+          },
+          {
+            id: "2",
+            nameEn: "លោក ទៀ សុខា Mr.TEA SOKHA",
+            nameKh: "លោក ទៀ សុខា",
+            category: "car_sale_supplier",
+            country: "CAMBODIA",
+            phone: "N/A",
+            job: "N/A",
+            gender: "male",
+          },
+          {
+            id: "3",
+            nameEn: "លោក ម៉ែន សុខ Mr.MEN SOK",
+            nameKh: "លោក ម៉ែន សុខ",
+            category: "car_sale_supplier",
+            country: "CAMBODIA",
+            phone: "011800889",
+            job: "Customer",
+            gender: "male",
+          },
+        ];
 
-      setSuppliers(
-        Array.isArray(suppliersData) &&
-        suppliersData.length > 0 &&
-        (suppliersData as SupplierItem[]).some((s) => s.nameEn?.includes("CHINA DONG FENG"))
-          ? (suppliersData as SupplierItem[])
-          : defaultSupplierList
-      );
+        setSuppliers(
+          Array.isArray(suppliersData) &&
+          suppliersData.length > 0 &&
+          (suppliersData as SupplierItem[]).some((s) => s.nameEn?.includes("CHINA DONG FENG"))
+            ? (suppliersData as SupplierItem[])
+            : defaultSupplierList
+        );
 
-      if (Array.isArray(profilesData) && profilesData.length > 0) {
-        setCompanyProfiles(profilesData as CompanyProfileItem[]);
-        if (!selectedProfileId && profilesData[0]?.id) {
-          setSelectedProfileId(profilesData[0].id);
+        if (Array.isArray(customersData) && customersData.length > 0) {
+          setCustomers(
+            customersData.map((c: any) => ({
+              id: c.id,
+              name: c.name,
+              gender: c.gender || "Female",
+              dob: c.dob ? new Date(c.dob).toLocaleDateString() : "",
+              idCard: c.idCard || "",
+              address: c.address || "",
+              job: c.job || "N/A",
+              phone: c.phone || "",
+              email: c.email || "",
+              note: c.note || "",
+            }))
+          );
         }
       }
-
-      if (Array.isArray(customersData) && customersData.length > 0) {
-        setCustomers(
-          customersData.map((c: any) => ({
-            id: c.id,
-            name: c.name,
-            gender: c.gender || "Female",
-            dob: c.dob ? new Date(c.dob).toLocaleDateString() : "",
-            idCard: c.idCard || "",
-            address: c.address || "",
-            job: c.job || "N/A",
-            phone: c.phone || "",
-            email: c.email || "",
-            note: c.note || "",
-          }))
-        );
-      }
+      loadedTabs.current.add(tab);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -413,9 +428,13 @@ function SettingsContent() {
     }
   };
 
+  const fetchAll = async () => {
+    await fetchTabData(currentTab, true);
+  };
+
   useEffect(() => {
-    fetchAll();
-  }, []);
+    fetchTabData(currentTab);
+  }, [currentTab]);
 
   // Handle Add Brand
   const handleCreateBrand = async (e: React.FormEvent) => {
@@ -508,12 +527,37 @@ function SettingsContent() {
   };
 
   // Handle Add Country
-  const handleCreateCountry = (e: React.FormEvent) => {
+  const handleCreateCountry = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCountryName.trim()) return;
-    setCountries((prev) => [...prev, newCountryName.trim().toUpperCase()]);
-    setNewCountryName("");
-    setIsAddCountryOpen(false);
+    setSubmitting(true);
+    try {
+      await settingsService.createCountry(newCountryName.trim().toUpperCase());
+      setNewCountryName("");
+      setIsAddCountryOpen(false);
+      await fetchAll();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to create country");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle Edit Country
+  const handleUpdateCountry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCountry || !editCountryName.trim()) return;
+    setSubmitting(true);
+    try {
+      await settingsService.updateCountry(editingCountry.id, editCountryName.trim().toUpperCase());
+      setEditingCountry(null);
+      setEditCountryName("");
+      await fetchAll();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to update country");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -593,29 +637,31 @@ function SettingsContent() {
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {brands.length > 0 ? (
-                  brands.map((brand, idx) => (
-                    <tr key={brand.id} className="hover:bg-slate-50/70">
-                      <td className="py-2.5 px-4 font-semibold text-slate-800">
-                        {149 + idx}
-                      </td>
-                      <td className="py-2.5 px-4 font-medium uppercase text-slate-800">
-                        {brand.name}
-                      </td>
-                      <td className="py-2.5 px-4">
-                        <button
-                          type="button"
-                          className="bg-[#0284c7] hover:bg-[#0369a1] text-white p-1 rounded-xs cursor-pointer transition-colors"
-                          title="Edit"
-                        >
-                          <Edit className="h-3 w-3" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  brands
+                    .slice((brandsPage - 1) * PAGE_SIZE, brandsPage * PAGE_SIZE)
+                    .map((brand, idx) => (
+                      <tr key={brand.id} className="hover:bg-slate-50/70">
+                        <td className="py-2.5 px-4 font-semibold text-slate-800">
+                          {(brandsPage - 1) * PAGE_SIZE + idx + 1}
+                        </td>
+                        <td className="py-2.5 px-4 font-medium uppercase text-slate-800">
+                          {brand.name}
+                        </td>
+                        <td className="py-2.5 px-4">
+                          <button
+                            type="button"
+                            className="bg-[#0284c7] hover:bg-[#0369a1] text-white p-1 rounded-xs cursor-pointer transition-colors"
+                            title="Edit"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
                 ) : (
                   <>
                     <tr className="hover:bg-slate-50/70">
-                      <td className="py-2.5 px-4 font-semibold text-slate-800">149</td>
+                      <td className="py-2.5 px-4 font-semibold text-slate-800">1</td>
                       <td className="py-2.5 px-4 font-medium uppercase text-slate-800">MHERO</td>
                       <td className="py-2.5 px-4">
                         <button type="button" className="bg-[#0284c7] text-white p-1 rounded-xs">
@@ -624,7 +670,7 @@ function SettingsContent() {
                       </td>
                     </tr>
                     <tr className="hover:bg-slate-50/70">
-                      <td className="py-2.5 px-4 font-semibold text-slate-800">150</td>
+                      <td className="py-2.5 px-4 font-semibold text-slate-800">2</td>
                       <td className="py-2.5 px-4 font-medium uppercase text-slate-800">VOYAH</td>
                       <td className="py-2.5 px-4">
                         <button type="button" className="bg-[#0284c7] text-white p-1 rounded-xs">
@@ -636,6 +682,13 @@ function SettingsContent() {
                 )}
               </tbody>
             </table>
+
+            <TablePagination
+              currentPage={brandsPage}
+              totalItems={brands.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setBrandsPage}
+            />
           </div>
         </div>
       )}
@@ -796,39 +849,48 @@ function SettingsContent() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
-                    {branches.map((b, idx) => (
-                      <tr key={b.id} className="hover:bg-slate-50/70">
-                        <td className="py-2.5 px-4 font-semibold text-slate-800">
-                          {b.id === "1" ? "1" : b.id === "2" ? "2" : b.id === "7" ? "7" : idx + 1}
-                        </td>
-                        <td className="py-2.5 px-4 font-semibold text-slate-800 uppercase">
-                          {b.name}
-                        </td>
-                        <td className="py-2.5 px-4 text-slate-600">{b.address || ""}</td>
-                        <td className="py-2.5 px-4 text-slate-600">{b.phone1 || ""}</td>
-                        <td className="py-2.5 px-4 text-slate-600">{b.phone2 || ""}</td>
-                        <td className="py-2.5 px-4 text-slate-500">{b.note || ""}</td>
-                        <td className="py-2.5 px-4">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingBranch(b);
-                              setEditBranchName(b.name);
-                              setEditBranchAddress(b.address || "");
-                              setEditBranchPhone1(b.phone1 || "");
-                              setEditBranchPhone2(b.phone2 || "");
-                              setEditBranchNote(b.note || "");
-                            }}
-                            className="bg-[#0284c7] hover:bg-[#0369a1] text-white p-1 rounded-xs cursor-pointer transition-colors"
-                            title="Edit"
-                          >
-                            <Edit className="h-3 w-3" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {branches
+                      .slice((branchesPage - 1) * PAGE_SIZE, branchesPage * PAGE_SIZE)
+                      .map((b, idx) => (
+                        <tr key={b.id} className="hover:bg-slate-50/70">
+                          <td className="py-2.5 px-4 font-semibold text-slate-800">
+                            {(branchesPage - 1) * PAGE_SIZE + idx + 1}
+                          </td>
+                          <td className="py-2.5 px-4 font-semibold text-slate-800 uppercase">
+                            {b.name}
+                          </td>
+                          <td className="py-2.5 px-4 text-slate-600">{b.address || ""}</td>
+                          <td className="py-2.5 px-4 text-slate-600">{b.phone1 || ""}</td>
+                          <td className="py-2.5 px-4 text-slate-600">{b.phone2 || ""}</td>
+                          <td className="py-2.5 px-4 text-slate-500">{b.note || ""}</td>
+                          <td className="py-2.5 px-4">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingBranch(b);
+                                setEditBranchName(b.name);
+                                setEditBranchAddress(b.address || "");
+                                setEditBranchPhone1(b.phone1 || "");
+                                setEditBranchPhone2(b.phone2 || "");
+                                setEditBranchNote(b.note || "");
+                              }}
+                              className="bg-[#0284c7] hover:bg-[#0369a1] text-white p-1 rounded-xs cursor-pointer transition-colors"
+                              title="Edit"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
+
+                <TablePagination
+                  currentPage={branchesPage}
+                  totalItems={branches.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setBranchesPage}
+                />
               </div>
             </div>
           )}
@@ -882,26 +944,40 @@ function SettingsContent() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {countries.map((country, idx) => (
-                  <tr key={country} className="hover:bg-slate-50/70">
-                    <td className="py-2.5 px-4 font-semibold text-slate-800">
-                      {idx + 1}
-                    </td>
-                    <td className="py-2.5 px-4 font-semibold uppercase text-slate-800">
-                      {country}
-                    </td>
-                    <td className="py-2.5 px-4">
-                      <button
-                        type="button"
-                        className="bg-[#0284c7] hover:bg-[#0369a1] text-white p-1 rounded-xs cursor-pointer transition-colors"
-                      >
-                        <Edit className="h-3 w-3" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {countries
+                  .slice((countriesPage - 1) * PAGE_SIZE, countriesPage * PAGE_SIZE)
+                  .map((country, idx) => (
+                    <tr key={country.id || country.name} className="hover:bg-slate-50/70">
+                      <td className="py-2.5 px-4 font-semibold text-slate-800">
+                        {(countriesPage - 1) * PAGE_SIZE + idx + 1}
+                      </td>
+                      <td className="py-2.5 px-4 font-semibold uppercase text-slate-800">
+                        {country.name}
+                      </td>
+                      <td className="py-2.5 px-4">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingCountry(country);
+                            setEditCountryName(country.name);
+                          }}
+                          className="bg-[#0284c7] hover:bg-[#0369a1] text-white p-1 rounded-xs cursor-pointer transition-colors"
+                          title="Edit country"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
+
+            <TablePagination
+              currentPage={countriesPage}
+              totalItems={countries.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setCountriesPage}
+            />
           </div>
         </div>
       )}
@@ -1064,7 +1140,11 @@ function SettingsContent() {
                 type="text"
                 placeholder="name"
                 value={searchName}
-                onChange={(e) => setSearchName(e.target.value)}
+                onChange={(e) => {
+                  setSearchName(e.target.value);
+                  setSuppliersPage(1);
+                  setCustomersPage(1);
+                }}
                 className="h-[34px] w-[220px] px-3 py-1.5 text-[14px] border rounded border-[#ccc] text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
               />
             </div>
@@ -1076,144 +1156,175 @@ function SettingsContent() {
                 type="text"
                 placeholder="phone number"
                 value={searchPhone}
-                onChange={(e) => setSearchPhone(e.target.value)}
+                onChange={(e) => {
+                  setSearchPhone(e.target.value);
+                  setSuppliersPage(1);
+                  setCustomersPage(1);
+                }}
                 className="h-[34px] w-[220px] px-3 py-1.5 text-[14px] border rounded border-[#ccc] text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
               />
             </div>
           </div>
 
           {/* Supplier Table matching Screenshot 111117 */}
-          {peopleSubTab === "supplier" && (
-            <div className="overflow-x-auto pt-3">
-              <table className="w-full text-left text-[13px] text-[#333] border-collapse">
-                <thead className="border-t border-b-2 border-[#ddd] text-[#333] font-bold">
-                  <tr>
-                    <th className="py-2.5 px-3 w-10">#</th>
-                    <th className="py-2.5 px-3">Name</th>
-                    <th className="py-2.5 px-3">Gender</th>
-                    <th className="py-2.5 px-3">Job</th>
-                    <th className="py-2.5 px-3">Phone</th>
-                    <th className="py-2.5 px-3">Email</th>
-                    <th className="py-2.5 px-3">Country</th>
-                    <th className="py-2.5 px-3">Type</th>
-                    <th className="py-2.5 px-3 w-12 text-center"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#e7eaec]">
-                  {suppliers
-                    .filter((s) =>
-                      searchName ? s.nameEn.toLowerCase().includes(searchName.toLowerCase()) : true
-                    )
-                    .filter((s) =>
-                      searchPhone && s.phone ? s.phone.includes(searchPhone) : true
-                    )
-                    .map((s, idx) => (
-                      <tr key={s.id} className="hover:bg-[#f9f9f9] transition-colors">
-                        <td className="py-2.5 px-3 font-semibold text-[#333]">{idx + 1}</td>
-                        <td className="py-2.5 px-3 font-medium text-[#333]">{s.nameEn}</td>
-                        <td className="py-2.5 px-3 text-[#333]">{s.gender || "male"}</td>
-                        <td className="py-2.5 px-3 text-[#333]">{s.job || "SUPPLIER"}</td>
-                        <td className="py-2.5 px-3 text-[#333]">{s.phone || "N/A"}</td>
-                        <td className="py-2.5 px-3 text-[#333]">{s.email || ""}</td>
-                        <td className="py-2.5 px-3 uppercase text-[#333] font-normal">
-                          {s.country || "CHINA"}
-                        </td>
-                        <td className="py-2.5 px-3 text-[#333]">{s.category}</td>
-                        <td className="py-2.5 px-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => setViewingSupplier(s)}
-                            className="p-1 px-2 border border-[#ccc] rounded bg-white text-[#333] hover:bg-[#e6e6e6] shadow-xs cursor-pointer inline-flex items-center justify-center transition-colors"
-                            title="View details"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </button>
+          {peopleSubTab === "supplier" && (() => {
+            const filteredSuppliers = suppliers
+              .filter((s) =>
+                searchName ? s.nameEn.toLowerCase().includes(searchName.toLowerCase()) : true
+              )
+              .filter((s) =>
+                searchPhone && s.phone ? s.phone.includes(searchPhone) : true
+              );
+            const paginatedSuppliers = filteredSuppliers.slice(
+              (suppliersPage - 1) * PAGE_SIZE,
+              suppliersPage * PAGE_SIZE
+            );
+
+            return (
+              <div className="overflow-x-auto pt-3 space-y-2">
+                <table className="w-full text-left text-[13px] text-[#333] border-collapse">
+                  <thead className="border-t border-b-2 border-[#ddd] text-[#333] font-bold">
+                    <tr>
+                      <th className="py-2.5 px-3 w-10">#</th>
+                      <th className="py-2.5 px-3">Name</th>
+                      <th className="py-2.5 px-3">Gender</th>
+                      <th className="py-2.5 px-3">Job</th>
+                      <th className="py-2.5 px-3">Phone</th>
+                      <th className="py-2.5 px-3">Email</th>
+                      <th className="py-2.5 px-3">Country</th>
+                      <th className="py-2.5 px-3">Type</th>
+                      <th className="py-2.5 px-3 w-12 text-center"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#e7eaec]">
+                    {paginatedSuppliers.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="py-8 text-center text-slate-400">
+                          No suppliers found
                         </td>
                       </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                    ) : (
+                      paginatedSuppliers.map((s, idx) => (
+                        <tr key={s.id} className="hover:bg-[#f9f9f9] transition-colors">
+                          <td className="py-2.5 px-3 font-semibold text-[#333]">
+                            {(suppliersPage - 1) * PAGE_SIZE + idx + 1}
+                          </td>
+                          <td className="py-2.5 px-3 font-medium text-[#333]">{s.nameEn}</td>
+                          <td className="py-2.5 px-3 text-[#333]">{s.gender || "male"}</td>
+                          <td className="py-2.5 px-3 text-[#333]">{s.job || "SUPPLIER"}</td>
+                          <td className="py-2.5 px-3 text-[#333]">{s.phone || "N/A"}</td>
+                          <td className="py-2.5 px-3 text-[#333]">{s.email || ""}</td>
+                          <td className="py-2.5 px-3 uppercase text-[#333] font-normal">
+                            {s.country || "CHINA"}
+                          </td>
+                          <td className="py-2.5 px-3 text-[#333]">{s.category}</td>
+                          <td className="py-2.5 px-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => setViewingSupplier(s)}
+                              className="p-1 px-2 border border-[#ccc] rounded bg-white text-[#333] hover:bg-[#e6e6e6] shadow-xs cursor-pointer inline-flex items-center justify-center transition-colors"
+                              title="View details"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+
+                <TablePagination
+                  currentPage={suppliersPage}
+                  totalItems={filteredSuppliers.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setSuppliersPage}
+                />
+              </div>
+            );
+          })()}
 
           {/* Customer Table matching Screenshot 111120 */}
-          {peopleSubTab === "customer" && (
-            <div className="overflow-x-auto pt-3">
-              <table className="w-full text-left text-[13px] text-[#333] border-collapse">
-                <thead className="border-t border-b-2 border-[#ddd] text-[#333] font-bold">
-                  <tr>
-                    <th className="py-2.5 px-3 w-10">#</th>
-                    <th className="py-2.5 px-3">Name</th>
-                    <th className="py-2.5 px-3">Gender</th>
-                    <th className="py-2.5 px-3">DateOfBirth</th>
-                    <th className="py-2.5 px-3">IDCard</th>
-                    <th className="py-2.5 px-3">Address</th>
-                    <th className="py-2.5 px-3">Job</th>
-                    <th className="py-2.5 px-3">Phone</th>
-                    <th className="py-2.5 px-3">Email</th>
-                    <th className="py-2.5 px-3">Note</th>
-                    <th className="py-2.5 px-3 w-12 text-center"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#e7eaec]">
-                  {customers
-                    .filter((c) =>
-                      searchName ? c.name.toLowerCase().includes(searchName.toLowerCase()) : true
-                    )
-                    .filter((c) =>
-                      searchPhone && c.phone ? c.phone.includes(searchPhone) : true
-                    )
-                    .map((c, idx) => (
-                      <tr key={c.id} className="hover:bg-[#f9f9f9] transition-colors">
-                        <td className="py-2.5 px-3 font-semibold text-[#333]">{idx + 1}</td>
-                        <td className="py-2.5 px-3 font-medium text-[#333]">{c.name}</td>
-                        <td className="py-2.5 px-3 text-[#333]">{c.gender || "Female"}</td>
-                        <td className="py-2.5 px-3 text-[#333]">{c.dob || ""}</td>
-                        <td className="py-2.5 px-3 text-[#333]">{c.idCard || ""}</td>
-                        <td className="py-2.5 px-3 text-[#333] leading-relaxed">
-                          {c.address || ""}
-                        </td>
-                        <td className="py-2.5 px-3 text-[#333]">{c.job || "N/A"}</td>
-                        <td className="py-2.5 px-3 text-[#333]">{c.phone}</td>
-                        <td className="py-2.5 px-3 text-[#333]">{c.email || ""}</td>
-                        <td className="py-2.5 px-3 text-[#333]">{c.note || ""}</td>
-                        <td className="py-2.5 px-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => setViewingCustomer(c)}
-                            className="p-1 px-2 border border-[#ccc] rounded bg-white text-[#333] hover:bg-[#e6e6e6] shadow-xs cursor-pointer inline-flex items-center justify-center transition-colors"
-                            title="View details"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </button>
+          {peopleSubTab === "customer" && (() => {
+            const filteredCustomers = customers
+              .filter((c) =>
+                searchName ? c.name.toLowerCase().includes(searchName.toLowerCase()) : true
+              )
+              .filter((c) =>
+                searchPhone && c.phone ? c.phone.includes(searchPhone) : true
+              );
+            const paginatedCustomers = filteredCustomers.slice(
+              (customersPage - 1) * PAGE_SIZE,
+              customersPage * PAGE_SIZE
+            );
+
+            return (
+              <div className="overflow-x-auto pt-3 space-y-2">
+                <table className="w-full text-left text-[13px] text-[#333] border-collapse">
+                  <thead className="border-t border-b-2 border-[#ddd] text-[#333] font-bold">
+                    <tr>
+                      <th className="py-2.5 px-3 w-10">#</th>
+                      <th className="py-2.5 px-3">Name</th>
+                      <th className="py-2.5 px-3">Gender</th>
+                      <th className="py-2.5 px-3">DateOfBirth</th>
+                      <th className="py-2.5 px-3">IDCard</th>
+                      <th className="py-2.5 px-3">Address</th>
+                      <th className="py-2.5 px-3">Job</th>
+                      <th className="py-2.5 px-3">Phone</th>
+                      <th className="py-2.5 px-3">Email</th>
+                      <th className="py-2.5 px-3">Note</th>
+                      <th className="py-2.5 px-3 w-12 text-center"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#e7eaec]">
+                    {paginatedCustomers.length === 0 ? (
+                      <tr>
+                        <td colSpan={11} className="py-8 text-center text-slate-400">
+                          No customers found
                         </td>
                       </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                    ) : (
+                      paginatedCustomers.map((c, idx) => (
+                        <tr key={c.id} className="hover:bg-[#f9f9f9] transition-colors">
+                          <td className="py-2.5 px-3 font-semibold text-[#333]">
+                            {(customersPage - 1) * PAGE_SIZE + idx + 1}
+                          </td>
+                          <td className="py-2.5 px-3 font-medium text-[#333]">{c.name}</td>
+                          <td className="py-2.5 px-3 text-[#333]">{c.gender || "Female"}</td>
+                          <td className="py-2.5 px-3 text-[#333]">{c.dob || ""}</td>
+                          <td className="py-2.5 px-3 text-[#333]">{c.idCard || ""}</td>
+                          <td className="py-2.5 px-3 text-[#333] leading-relaxed">
+                            {c.address || ""}
+                          </td>
+                          <td className="py-2.5 px-3 text-[#333]">{c.job || "N/A"}</td>
+                          <td className="py-2.5 px-3 text-[#333]">{c.phone}</td>
+                          <td className="py-2.5 px-3 text-[#333]">{c.email || ""}</td>
+                          <td className="py-2.5 px-3 text-[#333]">{c.note || ""}</td>
+                          <td className="py-2.5 px-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => setViewingCustomer(c)}
+                              className="p-1 px-2 border border-[#ccc] rounded bg-white text-[#333] hover:bg-[#e6e6e6] shadow-xs cursor-pointer inline-flex items-center justify-center transition-colors"
+                              title="View details"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
 
-          {/* Pagination footer matching Bootstrap 3 */}
-          <div className="flex items-center pt-3 text-[13px]">
-            <div className="inline-flex rounded border border-[#ddd] overflow-hidden shadow-xs">
-              <button className="px-3 py-1.5 border-r border-[#ddd] bg-white text-[#337ab7] hover:bg-[#eee] cursor-pointer">
-                &laquo;
-              </button>
-              <button className="px-3 py-1.5 border-r border-[#ddd] bg-white text-[#337ab7] hover:bg-[#eee] cursor-pointer">
-                Previous
-              </button>
-              <button className="px-3 py-1.5 border-r border-[#ddd] bg-[#337ab7] text-white font-medium cursor-pointer">
-                1
-              </button>
-              <button className="px-3 py-1.5 border-r border-[#ddd] bg-white text-[#337ab7] hover:bg-[#eee] cursor-pointer">
-                Next
-              </button>
-              <button className="px-3 py-1.5 bg-white text-[#337ab7] hover:bg-[#eee] cursor-pointer">
-                &raquo;
-              </button>
-            </div>
-          </div>
+                <TablePagination
+                  currentPage={customersPage}
+                  totalItems={filteredCustomers.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setCustomersPage}
+                />
+              </div>
+            );
+          })()}
 
           {/* Update Customer Modal matching user's screenshot media_1790327863897.png */}
           {viewingCustomer && (
@@ -1834,14 +1945,65 @@ function SettingsContent() {
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="submit"
-                  className="px-4 py-1.5 text-xs font-semibold text-white bg-[#1c64f2] hover:bg-[#1a56db] rounded"
+                  disabled={submitting}
+                  className="px-4 py-1.5 text-xs font-semibold text-white bg-[#1c64f2] hover:bg-[#1a56db] rounded cursor-pointer"
                 >
-                  Save
+                  {submitting ? "Saving..." : "Save"}
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsAddCountryOpen(false)}
-                  className="px-4 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded"
+                  className="px-4 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ───────────────────────────────────────────────────────────
+          MODAL: EDIT COUNTRY
+      ───────────────────────────────────────────────────────────── */}
+      {editingCountry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-md shadow-xl w-full max-w-md overflow-hidden border border-slate-300">
+            <div className="bg-[#112d59] text-white px-4 py-2.5 flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Edit Country</h3>
+              <button
+                type="button"
+                onClick={() => setEditingCountry(null)}
+                className="text-white/80 hover:text-white cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <form onSubmit={handleUpdateCountry} className="p-4 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Country Name *
+                </label>
+                <input
+                  type="text"
+                  value={editCountryName}
+                  onChange={(e) => setEditCountryName(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs border rounded border-slate-300 focus:outline-none focus:border-[#1c64f2]"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-1.5 text-xs font-semibold text-white bg-[#1c64f2] hover:bg-[#1a56db] rounded cursor-pointer"
+                >
+                  {submitting ? "Saving..." : "Update"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingCountry(null)}
+                  className="px-4 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded cursor-pointer"
                 >
                   Close
                 </button>

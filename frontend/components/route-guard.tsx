@@ -7,12 +7,11 @@ import { ShieldAlert, ArrowLeft } from "lucide-react";
 import type { UserRole } from "@csm/contracts";
 
 const routeRoleMap: { prefix: string; roles: UserRole[] }[] = [
-  { prefix: "/settings", roles: ["SUPER_ADMIN", "ADMIN"] },
   { prefix: "/users", roles: ["SUPER_ADMIN", "ADMIN"] },
-  { prefix: "/employees", roles: ["SUPER_ADMIN", "ADMIN"] },
+  { prefix: "/employees", roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"] },
   { prefix: "/finance", roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"] },
-  { prefix: "/logistics", roles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER"] },
-  { prefix: "/transfers", roles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER"] },
+  { prefix: "/logistics", roles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "ACCOUNTANT"] },
+  { prefix: "/transfers", roles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "SALE"] },
 ];
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {

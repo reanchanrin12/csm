@@ -444,6 +444,24 @@ export const settingsService = {
     }),
   deleteCompanyProfile: (id: string) =>
     apiFetch<void>(`/settings/company-profiles/${id}`, { method: "DELETE" }),
+
+  // Countries
+  getCountries: () =>
+    apiFetch<Array<{ id: string; name: string }>>("/settings/countries"),
+  createCountry: (name: string) =>
+    apiFetch<{ id: string; name: string }>("/settings/countries", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+  updateCountry: (id: string, name: string) =>
+    apiFetch<{ id: string; name: string }>(`/settings/countries/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    }),
+  deleteCountry: (id: string) =>
+    apiFetch<{ success: boolean; id: string }>(`/settings/countries/${id}`, {
+      method: "DELETE",
+    }),
 };
 
 // ─────────────────────────────────────────────

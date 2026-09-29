@@ -40,6 +40,7 @@ import {
   ArrowRightLeft,
 } from "lucide-react";
 import { transferService } from "@/lib/api";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 interface TransferRecord {
   id: string;
@@ -163,11 +164,25 @@ export default function TransfersPage() {
     });
   }, [transfers, brandFilter, modelFilter, vinFilter, yearFilter]);
 
+  // Pagination (10 items per page limit to prevent slow rendering)
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [brandFilter, modelFilter, vinFilter, yearFilter]);
+
+  const paginatedTransfers = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredTransfers.slice(start, start + pageSize);
+  }, [filteredTransfers, currentPage, pageSize]);
+
   const resetFilters = () => {
     setBrandFilter("");
     setModelFilter("");
     setVinFilter("");
     setYearFilter("");
+    setCurrentPage(1);
   };
 
   const handleExportCSV = () => {
@@ -565,13 +580,13 @@ export default function TransfersPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredTransfers.map((t, idx) => (
+                  paginatedTransfers.map((t, idx) => (
                     <TableRow
                       key={t.id}
                       className="hover:bg-muted/40 transition-colors"
                     >
                       <TableCell className="font-mono text-muted-foreground">
-                        {idx + 1}
+                        {(currentPage - 1) * pageSize + idx + 1}
                       </TableCell>
                       <TableCell className="font-semibold text-foreground uppercase">
                         {t.brand || "-"}
@@ -604,25 +619,13 @@ export default function TransfersPage() {
             </Table>
           </div>
 
-          {/* 7. Pagination Controls matching Screenshot */}
-          <div className="pt-1 flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled
-              className="h-8 text-xs px-3"
-            >
-              &laquo; Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled
-              className="h-8 text-xs px-3"
-            >
-              Next &raquo;
-            </Button>
-          </div>
+          {/* 7. Pagination Controls */}
+          <TablePagination
+            currentPage={currentPage}
+            totalItems={filteredTransfers.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+          />
         </div>
       </div>
     </div>
