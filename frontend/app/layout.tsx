@@ -25,6 +25,7 @@ const hanuman = Hanuman({
 });
 
 import { AuthProvider } from "@/lib/auth-context";
+import { GlobalLoader } from "@/components/ui/global-loader";
 
 export const metadata: Metadata = {
   title: "CSM - Car Showroom Management",
@@ -48,7 +49,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-screen bg-background text-foreground antialiased font-sans">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <GlobalLoader />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

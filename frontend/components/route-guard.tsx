@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { ShieldAlert, ArrowLeft } from "lucide-react";
@@ -19,7 +19,15 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  if (loading) {
+  useEffect(() => {
+    if (!loading && !user) {
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+    }
+  }, [loading, user]);
+
+  if (loading || !user) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="flex items-center gap-2 text-slate-500 text-sm">
@@ -28,10 +36,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         </div>
       </div>
     );
-  }
-
-  if (!user) {
-    return null;
   }
 
   // Super Admin bypass

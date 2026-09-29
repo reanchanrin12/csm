@@ -70,6 +70,8 @@ export class AuthController {
   async logout(@Res({ passthrough: true }) res: Response) {
     res.clearCookie('csm_token', {
       httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
       path: '/',
     });
     return { success: true, message: 'Logged out successfully' };

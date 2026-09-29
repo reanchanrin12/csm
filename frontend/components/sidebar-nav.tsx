@@ -67,7 +67,6 @@ const csmNavSections: NavSection[] = [
           { name: "Company Profile", href: "/settings?tab=profile" },
           { name: "Branch", href: "/settings?tab=branches" },
           { name: "Supplier & Customer", href: "/settings?tab=suppliers" },
-          { name: "System Users", href: "/settings?tab=users", roles: ["SUPER_ADMIN", "ADMIN"] },
         ],
       },
       {
@@ -131,9 +130,9 @@ const csmNavSections: NavSection[] = [
       },
       {
         name: "Repair",
-        href: "/inventory",
+        href: "/finance?tab=repair",
         icon: Wrench,
-        roles: ["SUPER_ADMIN", "ADMIN", "TECHNICIAN", "STOCK_CONTROLLER"],
+        roles: ["SUPER_ADMIN", "ADMIN", "TECHNICIAN", "STOCK_CONTROLLER", "ACCOUNTANT"],
       },
       {
         name: "Employee",

@@ -105,6 +105,49 @@ export class SalesService {
     });
   }
 
+  async updateCustomer(
+    id: string,
+    data: {
+      name?: string;
+      phone?: string;
+      gender?: string;
+      dob?: string;
+      idCard?: string;
+      address?: string;
+      job?: string;
+      email?: string;
+      note?: string;
+    },
+  ) {
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.phone !== undefined) updateData.phone = data.phone;
+    if (data.gender !== undefined) updateData.gender = data.gender;
+    if (data.dob !== undefined) updateData.dob = data.dob ? new Date(data.dob) : null;
+    if (data.idCard !== undefined) updateData.idCard = data.idCard;
+    if (data.address !== undefined) updateData.address = data.address;
+    if (data.job !== undefined) updateData.job = data.job;
+    if (data.email !== undefined) updateData.email = data.email;
+    if (data.note !== undefined) updateData.note = data.note;
+
+    return this.prisma.customer.update({
+      where: { id },
+      data: updateData,
+    });
+  }
+
+  async deleteCustomer(id: string) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id },
+      include: { _count: { select: { sales: true } } },
+    });
+    if (!customer) throw new NotFoundException('Customer not found');
+    if (customer._count.sales > 0) {
+      throw new BadRequestException('Cannot delete customer with linked sale orders');
+    }
+    return this.prisma.customer.delete({ where: { id } });
+  }
+
   // 2. Create Sale Order with optional Loan Schedule
   async createSaleOrder(dto: CreateSaleOrderDto) {
     const vehicle = await this.prisma.vehicle.findUnique({

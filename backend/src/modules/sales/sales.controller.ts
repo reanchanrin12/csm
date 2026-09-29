@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param } from '@nestjs/common';
 import { SalesService } from './sales.service';
 import {
   CreateSaleOrderSchema,
@@ -43,6 +43,30 @@ export class SalesController {
     },
   ) {
     return this.salesService.createCustomer(data);
+  }
+
+  @Patch('customers/:id')
+  updateCustomer(
+    @Param('id') id: string,
+    @Body()
+    data: {
+      name?: string;
+      phone?: string;
+      gender?: string;
+      dob?: string;
+      idCard?: string;
+      address?: string;
+      job?: string;
+      email?: string;
+      note?: string;
+    },
+  ) {
+    return this.salesService.updateCustomer(id, data);
+  }
+
+  @Delete('customers/:id')
+  deleteCustomer(@Param('id') id: string) {
+    return this.salesService.deleteCustomer(id);
   }
 
   @Get('loans')

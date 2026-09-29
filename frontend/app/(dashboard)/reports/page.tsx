@@ -27,6 +27,7 @@ import {
   costService,
   CustomerPaymentRecord,
 } from "@/lib/api";
+import type { OperatingExpenseItem } from "@csm/contracts";
 import { exportToCsv } from "@/lib/export-csv";
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -52,13 +53,7 @@ interface SaleOrderReportItem {
   };
 }
 
-interface ExpenseReportItem {
-  id: string;
-  expenseDate: string;
-  expenseTo: string;
-  amount: number;
-  details?: string | null | undefined;
-}
+type ExpenseReportItem = OperatingExpenseItem;
 
 interface VehicleReportItem {
   id: string;
@@ -68,22 +63,29 @@ interface VehicleReportItem {
   madeYear?: number | null | undefined;
   exteriorColor?: string | null | undefined;
   purchasePrice?: number | null | undefined;
+  purchaseCost?: number | null | undefined;
+  totalLandedCost?: number | null | undefined;
   status: string;
+  branchName?: string | null | undefined;
   currentBranch?: { name: string } | null | undefined;
   purchaseDate?: string | null | undefined;
+  supplierName?: string | null | undefined;
   supplier?: { nameEn: string } | null | undefined;
 }
 
 interface CostBillReportItem {
   id: string;
+  billNumber?: string | null | undefined;
   invoiceNo?: string | null | undefined;
   category: string;
   billDate: string;
   totalAmount: number;
   paidAmount: number;
   balance: number;
-  status: string;
+  status?: string | null | undefined;
+  supplierName?: string | null | undefined;
   supplier?: { nameEn: string } | null | undefined;
+  vehicles?: { vin: string; brand?: string | null | undefined; model?: string | null | undefined }[] | null | undefined;
   vehicle?: { vin: string; brand?: string | null | undefined; model?: string | null | undefined } | null | undefined;
 }
 
@@ -259,9 +261,9 @@ function ReportsContent() {
       }
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
-        const matchInv = item.invoiceNo?.toLowerCase().includes(q);
-        const matchSupp = item.supplier?.nameEn?.toLowerCase().includes(q);
-        const matchVin = item.vehicle?.vin?.toLowerCase().includes(q);
+        const matchInv = (item.billNumber || item.invoiceNo)?.toLowerCase().includes(q);
+        const matchSupp = (item.supplierName || item.supplier?.nameEn)?.toLowerCase().includes(q);
+        const matchVin = (item.vehicles?.[0]?.vin || item.vehicle?.vin)?.toLowerCase().includes(q);
         if (!matchInv && !matchSupp && !matchVin) return false;
       }
       return true;
@@ -338,23 +340,23 @@ function ReportsContent() {
         item.model,
         item.madeYear || "",
         item.exteriorColor || "",
-        item.purchasePrice || 0,
+        item.purchaseCost ?? item.purchasePrice ?? 0,
         item.status,
-        item.currentBranch?.name || "",
+        item.branchName || item.currentBranch?.name || "",
       ]);
       exportToCsv("Inventory_Report", headers, rows);
     } else if (activeTab === "logistics") {
       const headers = ["Invoice No", "Category", "Bill Date", "Supplier", "Total ($)", "Paid ($)", "Balance ($)", "Status", "Vehicle VIN"];
       const rows = filteredCosts.map((item) => [
-        item.invoiceNo || "N/A",
+        item.billNumber || item.invoiceNo || "N/A",
         item.category,
         item.billDate ? item.billDate.slice(0, 10) : "",
-        item.supplier?.nameEn || "",
+        item.supplierName || item.supplier?.nameEn || "",
         item.totalAmount,
         item.paidAmount,
         item.balance,
-        item.status,
-        item.vehicle?.vin || "",
+        item.balance <= 0 ? "PAID" : "UNPAID",
+        item.vehicles?.[0]?.vin || item.vehicle?.vin || "",
       ]);
       exportToCsv(`Logistics_${selectedCategory}_Report`, headers, rows);
     } else if (activeTab === "loans") {
@@ -627,7 +629,7 @@ function ReportsContent() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-sky-400">
-                ${filteredInventory.reduce((s, i) => s + (i.purchasePrice || 0), 0).toLocaleString()}
+                ${filteredInventory.reduce((s, i) => s + (i.purchaseCost ?? i.purchasePrice ?? 0), 0).toLocaleString()}
               </div>
             </CardContent>
           </Card>
@@ -824,10 +826,10 @@ function ReportsContent() {
                       <td className="px-4 py-2.5">{item.madeYear || "-"}</td>
                       <td className="px-4 py-2.5">{item.exteriorColor || "-"}</td>
                       <td className="px-4 py-2.5 text-right font-semibold text-emerald-400">
-                        ${(item.purchasePrice || 0).toLocaleString()}
+                        ${((item.purchaseCost ?? item.purchasePrice) || 0).toLocaleString()}
                       </td>
                       <td className="px-4 py-2.5 text-slate-300">
-                        {item.currentBranch?.name || "PHNOM PENH"}
+                        {item.branchName || item.currentBranch?.name || "PHNOM PENH"}
                       </td>
                       <td className="px-4 py-2.5 text-center">
                         <Badge
@@ -877,7 +879,7 @@ function ReportsContent() {
                   .map((item) => (
                     <tr key={item.id} className="hover:bg-slate-800/30">
                       <td className="px-4 py-2.5 font-medium text-sky-400">
-                        {item.invoiceNo || "N/A"}
+                        {item.billNumber || item.invoiceNo || "N/A"}
                       </td>
                       <td className="px-4 py-2.5">
                         <Badge variant="outline" className="border-slate-700 text-slate-300 text-[10px]">
@@ -885,9 +887,9 @@ function ReportsContent() {
                         </Badge>
                       </td>
                       <td className="px-4 py-2.5">{item.billDate ? item.billDate.slice(0, 10) : "-"}</td>
-                      <td className="px-4 py-2.5 text-white">{item.supplier?.nameEn || "-"}</td>
+                      <td className="px-4 py-2.5 text-white">{item.supplierName || item.supplier?.nameEn || "-"}</td>
                       <td className="px-4 py-2.5 font-mono text-slate-400 text-[11px]">
-                        {item.vehicle?.vin || "-"}
+                        {item.vehicles?.[0]?.vin || item.vehicle?.vin || "-"}
                       </td>
                       <td className="px-4 py-2.5 text-right font-semibold text-white">
                         ${(item.totalAmount || 0).toLocaleString()}

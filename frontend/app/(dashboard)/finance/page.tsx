@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CustomerPaymentView } from "@/components/finance/customer-payment-view";
 import { SupplierPaymentView } from "@/components/finance/supplier-payment-view";
+import { BankLoanListView } from "@/components/finance/bank-loan-list-view";
+import { RepairPaymentView } from "@/components/finance/repair-payment-view";
 import {
   Table,
   TableBody,
@@ -669,46 +671,6 @@ function MonthlyExpensesView() {
   );
 }
 
-function SupplierRepairPaymentView({ tab }: { tab: "supplier" | "repair" }) {
-  const isRepair = tab === "repair";
-  const title = isRepair ? "Repair Payment List" : "Supplier Payment List";
-  const subhead = isRepair
-    ? "repair invoice & bill payments"
-    : "supplier invoice & bill payments";
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-1.5 text-xs text-slate-500">
-        <LayoutGrid className="h-3.5 w-3.5 text-blue-600" />
-        <Link href="/" className="hover:text-blue-600 transition-colors">
-          Dashboard
-        </Link>
-        <span>&gt;</span>
-        <span className="text-slate-700 font-medium">{title}</span>
-      </div>
-
-      <div>
-        <h1 className="text-xl font-bold text-slate-800 tracking-tight">
-          {title}
-        </h1>
-        <p className="text-xs text-slate-500 mt-1">{subhead}</p>
-      </div>
-
-      <div className="bg-white border border-slate-200/80 rounded-md p-8 text-center shadow-2xs">
-        <FileText className="h-10 w-10 text-slate-300 mx-auto mb-2" />
-        <p className="text-xs font-semibold text-slate-700">
-          {isRepair
-            ? "មិនទាន់មានវិក្កយបត្រជួសជុលត្រូវទូទាត់ទេ"
-            : "មិនទាន់មានវិក្កយបត្រផ្គត់ផ្គង់ត្រូវទូទាត់ទេ"}
-        </p>
-        <p className="text-[11px] text-slate-400 mt-1">
-          (វិក្កយបត្រថ្លៃដើម Landed Cost នឹងបង្ហាញនៅពេលមានការបញ្ចូលវិក្កយបត្រនៅ Tax &amp; Clearance Fee ឬ Repair)
-        </p>
-      </div>
-    </div>
-  );
-}
-
 function FinanceContent() {
   const searchParams = useSearchParams();
   const tab = searchParams.get("tab") || "customer";
@@ -721,8 +683,12 @@ function FinanceContent() {
     return <SupplierPaymentView />;
   }
 
+  if (tab === "bank-loans" || tab === "loans") {
+    return <BankLoanListView />;
+  }
+
   if (tab === "repair") {
-    return <SupplierRepairPaymentView tab="repair" />;
+    return <RepairPaymentView />;
   }
 
   return <MonthlyExpensesView />;

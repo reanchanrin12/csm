@@ -73,6 +73,16 @@ export function middleware(request: NextRequest) {
 
   // 2. Handle /login page
   if (pathname === "/login") {
+    if (request.nextUrl.searchParams.has("logout")) {
+      const response = NextResponse.next();
+      response.cookies.delete("csm_token");
+      response.cookies.set("csm_token", "", {
+        path: "/",
+        expires: new Date(0),
+        maxAge: 0,
+      });
+      return response;
+    }
     if (user) {
       // Already authenticated -> Redirect to Dashboard
       return NextResponse.redirect(new URL("/", request.url));

@@ -48,7 +48,11 @@ interface SupplierItem {
   nameKh?: string | undefined;
   country?: string | undefined;
   phone?: string | undefined;
+  phone2?: string | undefined;
   email?: string | undefined;
+  website?: string | undefined;
+  address?: string | undefined;
+  note?: string | undefined;
   category: string;
   gender?: string | undefined;
   job?: string | undefined;
@@ -262,6 +266,20 @@ function SettingsContent() {
   ]);
   const [viewingCustomer, setViewingCustomer] = useState<CustomerItem | null>(null);
   const [viewingSupplier, setViewingSupplier] = useState<SupplierItem | null>(null);
+
+  // Supplier Add & Edit State
+  const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<SupplierItem | null>(null);
+  const [supplierNameEn, setSupplierNameEn] = useState("");
+  const [supplierNameKh, setSupplierNameKh] = useState("");
+  const [supplierCategory, setSupplierCategory] = useState<"VEHICLE" | "LOGISTICS" | "REPAIR" | "CUSTOMS">("VEHICLE");
+  const [supplierCountry, setSupplierCountry] = useState("CAMBODIA");
+  const [supplierPhone, setSupplierPhone] = useState("");
+  const [supplierPhone2, setSupplierPhone2] = useState("");
+  const [supplierEmail, setSupplierEmail] = useState("");
+  const [supplierWebsite, setSupplierWebsite] = useState("");
+  const [supplierAddress, setSupplierAddress] = useState("");
+  const [supplierNote, setSupplierNote] = useState("");
 
   // Modal Dialogs
   const [isAddBrandOpen, setIsAddBrandOpen] = useState(false);
@@ -1126,9 +1144,34 @@ function SettingsContent() {
           </div>
 
           {/* Sub-heading */}
-          <h3 className="text-[18px] font-bold text-[#333] pt-2">
-            {peopleSubTab === "supplier" ? "Supplier list" : "Customer list"}
-          </h3>
+          <div className="flex items-center justify-between pt-2">
+            <h3 className="text-[18px] font-bold text-[#333]">
+              {peopleSubTab === "supplier" ? "Supplier list" : "Customer list"}
+            </h3>
+            {peopleSubTab === "supplier" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingSupplier(null);
+                  setSupplierNameEn("");
+                  setSupplierNameKh("");
+                  setSupplierCategory("VEHICLE");
+                  setSupplierCountry("CAMBODIA");
+                  setSupplierPhone("");
+                  setSupplierPhone2("");
+                  setSupplierEmail("");
+                  setSupplierWebsite("");
+                  setSupplierAddress("");
+                  setSupplierNote("");
+                  setIsAddSupplierOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#337ab7] hover:bg-[#286090] text-white rounded text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add Supplier</span>
+              </button>
+            )}
+          </div>
 
           {/* Filter Inputs matching Bootstrap form-control */}
           <div className="flex flex-wrap items-center gap-6 pt-1">
@@ -1193,7 +1236,7 @@ function SettingsContent() {
                       <th className="py-2.5 px-3">Email</th>
                       <th className="py-2.5 px-3">Country</th>
                       <th className="py-2.5 px-3">Type</th>
-                      <th className="py-2.5 px-3 w-12 text-center"></th>
+                      <th className="py-2.5 px-3 w-24 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#e7eaec]">
@@ -1219,14 +1262,55 @@ function SettingsContent() {
                           </td>
                           <td className="py-2.5 px-3 text-[#333]">{s.category}</td>
                           <td className="py-2.5 px-3 text-center">
-                            <button
-                              type="button"
-                              onClick={() => setViewingSupplier(s)}
-                              className="p-1 px-2 border border-[#ccc] rounded bg-white text-[#333] hover:bg-[#e6e6e6] shadow-xs cursor-pointer inline-flex items-center justify-center transition-colors"
-                              title="View details"
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                            </button>
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setViewingSupplier(s)}
+                                className="p-1 px-1.5 border border-[#ccc] rounded bg-white text-[#333] hover:bg-[#e6e6e6] shadow-xs cursor-pointer inline-flex items-center justify-center transition-colors"
+                                title="View details"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingSupplier(s);
+                                  setSupplierNameEn(s.nameEn || "");
+                                  setSupplierNameKh(s.nameKh || "");
+                                  setSupplierCategory(
+                                    (s.category as any) || "VEHICLE"
+                                  );
+                                  setSupplierCountry(s.country || "CAMBODIA");
+                                  setSupplierPhone(s.phone || "");
+                                  setSupplierPhone2(s.phone2 || "");
+                                  setSupplierEmail(s.email || "");
+                                  setSupplierWebsite(s.website || "");
+                                  setSupplierAddress(s.address || "");
+                                  setSupplierNote(s.note || "");
+                                  setIsAddSupplierOpen(true);
+                                }}
+                                className="p-1 px-1.5 border border-[#ccc] rounded bg-white text-blue-600 hover:bg-[#e6e6e6] shadow-xs cursor-pointer inline-flex items-center justify-center transition-colors"
+                                title="Edit supplier"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!confirm(`Are you sure you want to delete supplier "${s.nameEn}"?`)) return;
+                                  try {
+                                    await settingsService.deleteSupplier(s.id);
+                                    setSuppliers((prev) => prev.filter((item) => item.id !== s.id));
+                                  } catch (err: unknown) {
+                                    alert(err instanceof Error ? err.message : "Failed to delete supplier");
+                                  }
+                                }}
+                                className="p-1 px-1.5 border border-[#ccc] rounded bg-white text-destructive hover:bg-destructive/10 shadow-xs cursor-pointer inline-flex items-center justify-center transition-colors"
+                                title="Delete supplier"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -1344,12 +1428,31 @@ function SettingsContent() {
 
                 {/* Modal Body */}
                 <form
-                  onSubmit={(e) => {
+                  onSubmit={async (e) => {
                     e.preventDefault();
-                    setCustomers((prev) =>
-                      prev.map((c) => (c.id === viewingCustomer.id ? viewingCustomer : c))
-                    );
-                    setViewingCustomer(null);
+                    if (!viewingCustomer) return;
+                    setSubmitting(true);
+                    try {
+                      await customerService.update(viewingCustomer.id, {
+                        name: viewingCustomer.name,
+                        gender: viewingCustomer.gender || undefined,
+                        dob: viewingCustomer.dob || undefined,
+                        idCard: viewingCustomer.idCard || undefined,
+                        address: viewingCustomer.address || undefined,
+                        job: viewingCustomer.job || undefined,
+                        phone: viewingCustomer.phone,
+                        email: viewingCustomer.email || undefined,
+                        note: viewingCustomer.note || undefined,
+                      });
+                      setCustomers((prev) =>
+                        prev.map((c) => (c.id === viewingCustomer.id ? viewingCustomer : c))
+                      );
+                      setViewingCustomer(null);
+                    } catch (err: unknown) {
+                      alert(err instanceof Error ? err.message : "Failed to update customer");
+                    } finally {
+                      setSubmitting(false);
+                    }
                   }}
                   className="p-6 space-y-4 text-xs text-[#333]"
                 >
@@ -1566,16 +1669,47 @@ function SettingsContent() {
                 <div className="p-5 space-y-3 text-xs text-slate-700">
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <span className="font-semibold text-slate-500">Name:</span>{" "}
+                      <span className="font-semibold text-slate-500">Name (EN):</span>{" "}
                       {viewingSupplier.nameEn}
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-500">Name (KH):</span>{" "}
+                      {viewingSupplier.nameKh || "—"}
                     </div>
                     <div>
                       <span className="font-semibold text-slate-500">Country:</span>{" "}
                       {viewingSupplier.country || "CHINA"}
                     </div>
                     <div>
-                      <span className="font-semibold text-slate-500">Phone:</span>{" "}
+                      <span className="font-semibold text-slate-500">Category:</span>{" "}
+                      {viewingSupplier.category}
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-500">Phone 1:</span>{" "}
                       {viewingSupplier.phone || "N/A"}
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-500">Phone 2:</span>{" "}
+                      {viewingSupplier.phone2 || "—"}
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-500">Email:</span>{" "}
+                      {viewingSupplier.email || "—"}
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-500">Website:</span>{" "}
+                      {viewingSupplier.website ? (
+                        <a
+                          href={viewingSupplier.website.startsWith("http") ? viewingSupplier.website : `https://${viewingSupplier.website}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          {viewingSupplier.website}
+                        </a>
+                      ) : (
+                        "—"
+                      )}
                     </div>
                     <div>
                       <span className="font-semibold text-slate-500">Job/Role:</span>{" "}
@@ -1583,13 +1717,15 @@ function SettingsContent() {
                     </div>
                   </div>
                   <div>
-                    <span className="font-semibold text-slate-500">Category:</span>{" "}
-                    {viewingSupplier.category}
+                    <span className="font-semibold text-slate-500">Address:</span>{" "}
+                    {viewingSupplier.address || "—"}
                   </div>
-                  <div>
-                    <span className="font-semibold text-slate-500">Email:</span>{" "}
-                    {viewingSupplier.email || "N/A"}
-                  </div>
+                  {viewingSupplier.note && (
+                    <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
+                      <span className="font-semibold text-slate-500 block mb-0.5">Note:</span>
+                      <p className="text-slate-600 whitespace-pre-wrap">{viewingSupplier.note}</p>
+                    </div>
+                  )}
                   <div className="flex justify-end pt-3 border-t border-slate-100">
                     <button
                       type="button"
@@ -1600,6 +1736,238 @@ function SettingsContent() {
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Add / Edit Supplier Modal */}
+          {isAddSupplierOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+              <div className="bg-white rounded shadow-2xl w-full max-w-xl overflow-hidden border border-slate-300 my-8">
+                <div className="bg-[#112d59] text-white px-5 py-3 flex items-center justify-between">
+                  <h3 className="text-sm font-bold tracking-wide">
+                    {editingSupplier ? "Edit Supplier" : "Add New Supplier"}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddSupplierOpen(false);
+                      setEditingSupplier(null);
+                    }}
+                    className="text-white/80 hover:text-white cursor-pointer text-lg leading-none"
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!supplierNameEn.trim()) return;
+                    setSubmitting(true);
+                    try {
+                      if (editingSupplier) {
+                        await settingsService.updateSupplier(editingSupplier.id, {
+                          nameEn: supplierNameEn.trim(),
+                          nameKh: supplierNameKh.trim() || undefined,
+                          category: supplierCategory,
+                          country: supplierCountry.trim() || undefined,
+                          phone: supplierPhone.trim() || undefined,
+                          phone2: supplierPhone2.trim() || undefined,
+                          email: supplierEmail.trim() || undefined,
+                          website: supplierWebsite.trim() || undefined,
+                          address: supplierAddress.trim() || undefined,
+                          note: supplierNote.trim() || undefined,
+                        });
+                      } else {
+                        await settingsService.createSupplier({
+                          nameEn: supplierNameEn.trim(),
+                          nameKh: supplierNameKh.trim() || undefined,
+                          category: supplierCategory,
+                          country: supplierCountry.trim() || undefined,
+                          phone: supplierPhone.trim() || undefined,
+                          phone2: supplierPhone2.trim() || undefined,
+                          email: supplierEmail.trim() || undefined,
+                          website: supplierWebsite.trim() || undefined,
+                          address: supplierAddress.trim() || undefined,
+                          note: supplierNote.trim() || undefined,
+                        });
+                      }
+                      const refreshed = await settingsService.getSuppliers();
+                      setSuppliers(refreshed as SupplierItem[]);
+                      setIsAddSupplierOpen(false);
+                      setEditingSupplier(null);
+                    } catch (err: unknown) {
+                      alert(err instanceof Error ? err.message : "Failed to save supplier");
+                    } finally {
+                      setSubmitting(false);
+                    }
+                  }}
+                  className="p-6 space-y-3.5 text-xs text-[#333]"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[12px] font-semibold text-[#555] mb-1">
+                        Supplier Name (EN) *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. CHINA DONG FENG MOTOR"
+                        value={supplierNameEn}
+                        onChange={(e) => setSupplierNameEn(e.target.value)}
+                        className="w-full h-[34px] px-3 text-[13px] border rounded border-[#ccc] text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[12px] font-semibold text-[#555] mb-1">
+                        Supplier Name (KH)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="ឈ្មោះជាភាសាខ្មែរ..."
+                        value={supplierNameKh}
+                        onChange={(e) => setSupplierNameKh(e.target.value)}
+                        className="w-full h-[34px] px-3 text-[13px] border rounded border-[#ccc] text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[12px] font-semibold text-[#555] mb-1">
+                        Category / Type *
+                      </label>
+                      <select
+                        value={supplierCategory}
+                        onChange={(e) =>
+                          setSupplierCategory(
+                            e.target.value as "VEHICLE" | "LOGISTICS" | "REPAIR" | "CUSTOMS"
+                          )
+                        }
+                        className="w-full h-[34px] px-3 text-[13px] border rounded border-[#ccc] bg-white text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                      >
+                        <option value="VEHICLE">VEHICLE (រថយន្ត)</option>
+                        <option value="LOGISTICS">LOGISTICS (ដឹកជញ្ជូន/កុងតឺន័រ)</option>
+                        <option value="REPAIR">REPAIR (ជួសជុល/គ្រឿងបន្លាស់)</option>
+                        <option value="CUSTOMS">CUSTOMS (ពន្ធគយ &amp; Clearance)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[12px] font-semibold text-[#555] mb-1">
+                        Country
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. CAMBODIA, CHINA, THAILAND"
+                        value={supplierCountry}
+                        onChange={(e) => setSupplierCountry(e.target.value)}
+                        className="w-full h-[34px] px-3 text-[13px] border rounded border-[#ccc] text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[12px] font-semibold text-[#555] mb-1">
+                        Phone 1
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Primary phone number..."
+                        value={supplierPhone}
+                        onChange={(e) => setSupplierPhone(e.target.value)}
+                        className="w-full h-[34px] px-3 text-[13px] border rounded border-[#ccc] text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[12px] font-semibold text-[#555] mb-1">
+                        Phone 2
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Secondary phone number..."
+                        value={supplierPhone2}
+                        onChange={(e) => setSupplierPhone2(e.target.value)}
+                        className="w-full h-[34px] px-3 text-[13px] border rounded border-[#ccc] text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[12px] font-semibold text-[#555] mb-1">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        placeholder="e.g. supplier@example.com"
+                        value={supplierEmail}
+                        onChange={(e) => setSupplierEmail(e.target.value)}
+                        className="w-full h-[34px] px-3 text-[13px] border rounded border-[#ccc] text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[12px] font-semibold text-[#555] mb-1">
+                        Website
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. www.dongfeng.com"
+                        value={supplierWebsite}
+                        onChange={(e) => setSupplierWebsite(e.target.value)}
+                        className="w-full h-[34px] px-3 text-[13px] border rounded border-[#ccc] text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[12px] font-semibold text-[#555] mb-1">
+                      Address
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Wuhan, Hubei, China or Phnom Penh, Cambodia"
+                      value={supplierAddress}
+                      onChange={(e) => setSupplierAddress(e.target.value)}
+                      className="w-full h-[34px] px-3 text-[13px] border rounded border-[#ccc] text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[12px] font-semibold text-[#555] mb-1">
+                      Note
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Additional details about this supplier..."
+                      value={supplierNote}
+                      onChange={(e) => setSupplierNote(e.target.value)}
+                      className="w-full p-2 text-[13px] border rounded border-[#ccc] text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddSupplierOpen(false);
+                        setEditingSupplier(null);
+                      }}
+                      className="px-4 py-1.5 text-xs font-medium text-[#333] bg-white border border-[#ccc] rounded hover:bg-[#e6e6e6] shadow-xs cursor-pointer transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-[#337ab7] hover:bg-[#286090] rounded shadow-xs cursor-pointer transition-colors disabled:opacity-50"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>{submitting ? "Saving..." : editingSupplier ? "Save Changes" : "Create Supplier"}</span>
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           )}

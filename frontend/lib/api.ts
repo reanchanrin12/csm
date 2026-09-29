@@ -300,6 +300,32 @@ export const employeeService = {
 // ─────────────────────────────────────────────
 // COSTS (Landed Cost Items & Bills)
 // ─────────────────────────────────────────────
+export interface LandedCostBillVehicleItem {
+  id: string;
+  vin: string;
+  brand: string;
+  model: string;
+  madeYear: number;
+  color: string;
+  costType: string;
+  vehicleName: string;
+  allocatedAmount: number;
+}
+
+export interface LandedCostBillRecord {
+  id: string;
+  billNumber: string;
+  category: string;
+  supplierId: string;
+  supplierName: string;
+  totalAmount: number;
+  paidAmount: number;
+  balance: number;
+  billDate: string;
+  description: string | null;
+  vehicles: LandedCostBillVehicleItem[];
+}
+
 export const costService = {
   addItem: (dto: unknown) =>
     apiFetch<unknown>("/costs/items", {
@@ -308,7 +334,7 @@ export const costService = {
     }),
 
   getBills: (category?: string) =>
-    apiFetch<unknown[]>(category ? `/costs/bills?category=${encodeURIComponent(category)}` : "/costs/bills"),
+    apiFetch<LandedCostBillRecord[]>(category ? `/costs/bills?category=${encodeURIComponent(category)}` : "/costs/bills"),
 
   getOptions: () =>
     apiFetch<{ suppliers: unknown[]; vehicles: unknown[] }>("/costs/options"),
@@ -485,6 +511,29 @@ export const customerService = {
     apiFetch<unknown>("/sales/customers", {
       method: "POST",
       body: JSON.stringify(dto),
+    }),
+  update: (
+    id: string,
+    dto: {
+      name?: string | undefined;
+      khmerName?: string | undefined;
+      phone?: string | undefined;
+      gender?: string | undefined;
+      dob?: string | undefined;
+      idCard?: string | undefined;
+      address?: string | undefined;
+      job?: string | undefined;
+      email?: string | undefined;
+      note?: string | undefined;
+    }
+  ) =>
+    apiFetch<unknown>(`/sales/customers/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(dto),
+    }),
+  delete: (id: string) =>
+    apiFetch<unknown>(`/sales/customers/${id}`, {
+      method: "DELETE",
     }),
 };
 

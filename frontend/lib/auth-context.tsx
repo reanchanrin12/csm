@@ -94,9 +94,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Proceed even if network request fails
     } finally {
       localStorage.removeItem("csm_token");
-      document.cookie = "csm_token=; path=/; max-age=0;";
+      document.cookie = "csm_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; max-age=0; SameSite=Lax;";
+      document.cookie = "csm_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; max-age=0;";
       setUser(null);
-      router.replace("/login");
+      if (typeof window !== "undefined") {
+        window.location.href = "/login?logout=true";
+      }
     }
   };
 
