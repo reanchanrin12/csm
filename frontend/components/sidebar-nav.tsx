@@ -160,8 +160,8 @@ const csmNavSections: NavSection[] = [
         icon: FileText,
         roles: ["SUPER_ADMIN", "ADMIN", "SALE", "ACCOUNTANT"],
         subItems: [
-          { name: "Sale Details", href: "/sales" },
-          { name: "Sale Summary", href: "/sales" },
+          { name: "Sale Details", href: "/reports?tab=sales&view=details" },
+          { name: "Sale Summary", href: "/reports?tab=sales&view=summary" },
         ],
       },
       {
@@ -169,8 +169,8 @@ const csmNavSections: NavSection[] = [
         icon: FileText,
         roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"],
         subItems: [
-          { name: "Expense Details", href: "/finance?tab=expenses" },
-          { name: "Expense Summary", href: "/finance?tab=expenses" },
+          { name: "Expense Details", href: "/reports?tab=expenses&view=details" },
+          { name: "Expense Summary", href: "/reports?tab=expenses&view=summary" },
         ],
       },
       {
@@ -178,22 +178,22 @@ const csmNavSections: NavSection[] = [
         icon: FileText,
         roles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "ACCOUNTANT"],
         subItems: [
-          { name: "Stock List", href: "/inventory" },
-          { name: "Purchased Report", href: "/inventory" },
+          { name: "Stock List", href: "/reports?tab=inventory&view=stock" },
+          { name: "Purchased Report", href: "/reports?tab=inventory&view=purchased" },
         ],
       },
       {
         name: "Other Reports",
         icon: FileText,
-        roles: ["SUPER_ADMIN", "ADMIN"],
+        roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"],
         subItems: [
-          { name: "Arrears Payment", href: "/schedule" },
-          { name: "History Payment", href: "/schedule" },
-          { name: "Bank Payment", href: "/finance" },
-          { name: "Shipping", href: "/logistics" },
-          { name: "Tax & Clearance", href: "/logistics" },
-          { name: "Repair", href: "/inventory" },
-          { name: "Other expenses", href: "/finance?tab=expenses" },
+          { name: "Arrears Payment", href: "/reports?tab=loans&view=arrears" },
+          { name: "History Payment", href: "/reports?tab=loans&view=history" },
+          { name: "Bank Payment", href: "/reports?tab=loans&view=bank" },
+          { name: "Shipping", href: "/reports?tab=logistics&category=TRANSPORT" },
+          { name: "Tax & Clearance", href: "/reports?tab=logistics&category=TAX" },
+          { name: "Repair", href: "/reports?tab=logistics&category=REPAIR" },
+          { name: "Other expenses", href: "/reports?tab=expenses" },
         ],
       },
     ],
@@ -251,8 +251,10 @@ function SidebarNavContent() {
               const [path, query] = sub.href.split("?");
               if (pathname !== path) return false;
               if (!query) return true;
-              const expectedTab = new URLSearchParams(query).get("tab");
-              return expectedTab === currentTab;
+              const subParams = new URLSearchParams(query);
+              return Array.from(subParams.entries()).every(
+                ([key, val]) => searchParams.get(key) === val
+              );
             });
 
             if (isChildActive && !next[item.name]) {
@@ -265,7 +267,17 @@ function SidebarNavContent() {
 
       return hasChanges ? next : prev;
     });
-  }, [pathname, currentTab, visibleSections]);
+  }, [pathname, searchParams, visibleSections]);
+
+  const isMatchHref = (href: string) => {
+    const [path, query] = href.split("?");
+    if (pathname !== path) return false;
+    if (!query) return !rawTab;
+    const subParams = new URLSearchParams(query);
+    return Array.from(subParams.entries()).every(
+      ([key, val]) => searchParams.get(key) === val
+    );
+  };
 
   const toggleItem = (name: string) => {
     setOpenItems((prev) => ({
@@ -292,23 +304,12 @@ function SidebarNavContent() {
             const isOpen = !!openItems[item.name];
 
             // Check if top-level item is active
-            const isActive = item.href
-              ? item.href.includes("?")
-                ? pathname === item.href.split("?")[0] &&
-                  rawTab === new URLSearchParams(item.href.split("?")[1]).get("tab")
-                : pathname === item.href && !rawTab
-              : false;
+            const isActive = item.href ? isMatchHref(item.href) : false;
 
             // Check if any sub-item is currently active
             const hasActiveChild =
               hasSub &&
-              item.subItems!.some((sub) => {
-                const [path, query] = sub.href.split("?");
-                if (pathname !== path) return false;
-                if (!query) return !rawTab;
-                const expectedTab = new URLSearchParams(query).get("tab");
-                return expectedTab === currentTab;
-              });
+              item.subItems!.some((sub) => isMatchHref(sub.href));
 
             if (hasSub) {
               return (
@@ -344,13 +345,7 @@ function SidebarNavContent() {
                   {isOpen && (
                     <div className="pl-6 pr-1 py-1 space-y-0.5 border-l border-[#1a233a] ml-4">
                       {item.subItems!.map((sub) => {
-                        const [path, query] = sub.href.split("?");
-                        const expectedTab = query
-                          ? new URLSearchParams(query).get("tab")
-                          : null;
-                        const isSubActive =
-                          pathname === path &&
-                          (!query ? !rawTab : expectedTab === currentTab);
+                        const isSubActive = isMatchHref(sub.href);
 
                         return (
                           <Link

@@ -307,7 +307,8 @@ export const costService = {
       body: JSON.stringify(dto),
     }),
 
-  getBills: () => apiFetch<unknown[]>("/costs/bills"),
+  getBills: (category?: string) =>
+    apiFetch<unknown[]>(category ? `/costs/bills?category=${encodeURIComponent(category)}` : "/costs/bills"),
 
   getOptions: () =>
     apiFetch<{ suppliers: unknown[]; vehicles: unknown[] }>("/costs/options"),
