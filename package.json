@@ -1,0 +1,16 @@
+{
+  "name": "csm-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "build:contracts": "npm run build --workspace=@csm/contracts",
+    "dev:backend": "npm run start:dev --workspace=csm-api",
+    "dev:frontend": "npm run dev --workspace=csm-web",
+    "check:types": "npm run tsc --workspace=@csm/contracts && npm run tsc --workspace=csm-api && npm run tsc --workspace=csm-web"
+  }
+}
