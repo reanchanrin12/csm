@@ -7,6 +7,7 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PORT: 4000,
+        FRONTEND_URL: "https://csm.mhhcambodia.com",
       },
       instances: 1,
       autorestart: true,

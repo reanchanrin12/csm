@@ -18,6 +18,7 @@ async function bootstrap() {
     /^http:\/\/(localhost|127\.0\.0\.1)(:[0-9]+)?$/, // Localhost on any port (3000, 3001, etc.)
     /^http:\/\/192\.168\.\d+\.\d+(:[0-9]+)?$/,      // Local network devices (tablets, mobile, showroom PCs)
     /^http:\/\/10\.\d+\.\d+\.\d+(:[0-9]+)?$/,        // Private network
+    /^https?:\/\/([a-zA-Z0-9-]+\.)*mhhcambodia\.com(:[0-9]+)?$/, // Production domain & subdomains (e.g. https://csm.mhhcambodia.com)
   ];
 
   app.enableCors({
@@ -25,9 +26,18 @@ async function bootstrap() {
       // Allow requests with no origin (like mobile apps, curl, server-to-server)
       if (!origin) return callback(null, true);
 
-      // Check environment variable FRONTEND_URL if set
-      const configuredFrontend = process.env.FRONTEND_URL;
-      if (configuredFrontend && origin === configuredFrontend) {
+      const cleanOrigin = origin.replace(/\/$/, '');
+
+      // Always allow mhhcambodia.com and any subdomains (e.g. csm.mhhcambodia.com)
+      if (cleanOrigin.includes('mhhcambodia.com')) {
+        return callback(null, true);
+      }
+
+      // Check environment variable FRONTEND_URL if set (supports comma-separated origins)
+      const configuredFrontends = process.env.FRONTEND_URL
+        ? process.env.FRONTEND_URL.split(',').map((u) => u.trim().replace(/\/$/, ''))
+        : [];
+      if (configuredFrontends.includes(cleanOrigin)) {
         return callback(null, true);
       }
 
@@ -39,7 +49,9 @@ async function bootstrap() {
       if (isAllowed || process.env.NODE_ENV !== 'production') {
         callback(null, true);
       } else {
-        callback(new Error(`CORS blocked for origin: ${origin}`));
+        // Log warning and reject CORS cleanly without crashing with 500
+        console.warn(`[CORS] Blocked request from unauthorized origin: ${origin}`);
+        callback(null, false);
       }
     },
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],

@@ -149,7 +149,7 @@ export class UsersService {
     if (dto.username) dataToUpdate.username = dto.username;
     if (dto.role) dataToUpdate.role = dto.role;
     if (dto.isActive !== undefined) dataToUpdate.isActive = dto.isActive;
-    if (dto.employeeId !== undefined) dataToUpdate.employeeId = dto.employeeId;
+    if (dto.employeeId !== undefined) dataToUpdate.employeeId = dto.employeeId || null;
     if (dto.password && dto.password.trim().length > 0) {
       dataToUpdate.passwordHash = this.authService.hashPassword(dto.password);
     }
