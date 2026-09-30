@@ -1,0 +1,45 @@
+name: Auto Deploy to Production Server
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Production VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Remote Deployment over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script_stop: true
+          script: |
+            # Detect target directory
+            TARGET_DIR="${{ secrets.SERVER_PATH }}"
+            if [ -z "$TARGET_DIR" ]; then
+              if [ -d "/var/www/csm" ]; then
+                TARGET_DIR="/var/www/csm"
+              elif [ -d "$HOME/csm" ]; then
+                TARGET_DIR="$HOME/csm"
+              elif [ -d "/root/csm" ]; then
+                TARGET_DIR="/root/csm"
+              else
+                echo "❌ Error: Project directory not found. Please set SERVER_PATH secret."
+                exit 1
+              fi
+            fi
+
+            echo "📂 Moving to $TARGET_DIR..."
+            cd "$TARGET_DIR"
+
+            # Execute production deployment script
+            chmod +x deploy.sh
+            ./deploy.sh

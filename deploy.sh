@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+# Load NVM and Node/PM2 environment if available (ensures compatibility with GitHub Actions / non-interactive SSH)
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+export PATH=$PATH:/usr/local/bin:$HOME/.local/bin:$HOME/bin
+
 echo "🚀 Starting CSM Production Deployment..."
 
 echo "📥 [1/5] Pulling latest code from GitHub..."
@@ -8,6 +13,8 @@ git pull
 
 echo "📦 [2/5] Installing dependencies..."
 npm install
+# Ensure Tailwind CSS / LightningCSS linux native binary is present on Linux servers
+npm install -w csm-web lightningcss-linux-x64-gnu@1.32.0 --no-save 2>/dev/null || true
 
 echo "🔨 [3/5] Building contracts & backend..."
 npm run build:contracts
