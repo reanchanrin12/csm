@@ -199,7 +199,11 @@ const csmNavSections: NavSection[] = [
   },
 ];
 
-function SidebarNavContent() {
+export interface SidebarNavProps {
+  onNavigate?: (() => void) | undefined;
+}
+
+function SidebarNavContent({ onNavigate }: SidebarNavProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const rawTab = searchParams.get("tab");
@@ -350,6 +354,7 @@ function SidebarNavContent() {
                           <Link
                             key={sub.name}
                             href={sub.href}
+                            onClick={() => onNavigate?.()}
                             className={cn(
                               "block px-2.5 py-1.5 rounded-[2px] text-[12px] transition-colors truncate",
                               isSubActive
@@ -372,6 +377,7 @@ function SidebarNavContent() {
               <Link
                 key={item.name}
                 href={item.href || "#"}
+                onClick={() => onNavigate?.()}
                 className={cn(
                   "flex items-center gap-2.5 px-3 py-2 rounded text-[13px] transition-all",
                   isActive
@@ -395,14 +401,14 @@ function SidebarNavContent() {
   );
 }
 
-export function SidebarNav() {
+export function SidebarNav({ onNavigate }: SidebarNavProps = {}) {
   return (
     <React.Suspense
       fallback={
         <div className="p-3 text-slate-500 text-xs">Loading navigation...</div>
       }
     >
-      <SidebarNavContent />
+      <SidebarNavContent onNavigate={onNavigate} />
     </React.Suspense>
   );
 }

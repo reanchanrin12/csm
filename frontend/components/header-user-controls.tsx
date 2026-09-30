@@ -17,14 +17,14 @@ export function HeaderUserControls() {
   return (
     <>
       <div className="relative z-10 flex items-center gap-1.5 bg-[#0b1325]/90 border border-slate-700/60 rounded px-2.5 py-1 shadow-inner">
-        {/* Car Count */}
-        <div className="flex items-center gap-1 px-2 py-0.5 text-slate-300 hover:text-white cursor-pointer transition-colors border-r border-slate-700/50">
+        {/* Car Count (Desktop / Tablet only) */}
+        <div className="hidden sm:flex items-center gap-1 px-2 py-0.5 text-slate-300 hover:text-white cursor-pointer transition-colors border-r border-slate-700/50">
           <Car className="h-3.5 w-3.5" />
           <span className="text-[11px] font-bold">0</span>
         </div>
 
-        {/* Mail Count */}
-        <div className="flex items-center gap-1 px-2 py-0.5 text-slate-300 hover:text-white cursor-pointer transition-colors border-r border-slate-700/50">
+        {/* Mail Count (Desktop / Tablet only) */}
+        <div className="hidden sm:flex items-center gap-1 px-2 py-0.5 text-slate-300 hover:text-white cursor-pointer transition-colors border-r border-slate-700/50">
           <Mail className="h-3.5 w-3.5" />
           <span className="text-[11px] font-bold">0</span>
         </div>
