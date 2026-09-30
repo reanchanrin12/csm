@@ -93,28 +93,7 @@ function SettingsContent() {
   const [error, setError] = useState<string | null>(null);
 
   // Company Profile State
-  const [companyProfiles, setCompanyProfiles] = useState<CompanyProfileItem[]>([
-    {
-      id: "1",
-      name: "VOYAH & MHERO CAMBODIA (HQ)",
-      gender: "Male",
-      dob: "1990-01-01",
-      phone: "061 95 5555",
-      job: "Showroom Manager",
-      email: "info@henghuy.com",
-      note: "Headquarters main invoice profile",
-    },
-    {
-      id: "2",
-      name: "HENG HUY AUTO CARS CO., LTD",
-      gender: "Male",
-      dob: "1988-05-12",
-      phone: "069 23 4567",
-      job: "Managing Director",
-      email: "sales@henghuy.com",
-      note: "Official company profile for invoice printing",
-    },
-  ]);
+  const [companyProfiles, setCompanyProfiles] = useState<CompanyProfileItem[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState<string>("");
   const [isAddProfileOpen, setIsAddProfileOpen] = useState(false);
   const [profileName, setProfileName] = useState("");
@@ -130,140 +109,7 @@ function SettingsContent() {
   const [searchName, setSearchName] = useState("");
   const [searchPhone, setSearchPhone] = useState("");
 
-  const [customers, setCustomers] = useState<CustomerItem[]>([
-    {
-      id: "1",
-      name: "លោកស្រី ស្រ៊ិន គន្ធី",
-      gender: "Female",
-      dob: "1995-04-13",
-      idCard: "010883486(01)",
-      address: "ផ្ទះP0418 ផ្លូវ210 ភូមិព្រែកអញ្ចាញ2 សង្កាត់ព្រែកព្នៅ ខណ្ឌសែនសុខ ភ្នំពេញ",
-      job: "N/A",
-      phone: "093491199",
-      email: "",
-      note: "",
-    },
-    {
-      id: "2",
-      name: "លោក ធុនរស្មី",
-      gender: "Male",
-      dob: "1979-12-21",
-      idCard: "020453196(02)",
-      address: "ផ្ទះលេខ9A ភូមិព្រែកសំរោង៣ សង្កាត់តាខ្មៅ កណ្ដាល",
-      job: "N/A",
-      phone: "0888055555",
-      email: "",
-      note: "",
-    },
-    {
-      id: "3",
-      name: "លោក ស៊ីថា សុភាពវឌ្ឍិត",
-      gender: "Male",
-      dob: "2003-02-21",
-      idCard: "011366442",
-      address: "ផ្ទះលេខ103ឈ ផ្លូវលំ ខណ្ឌដូនពេញ ភ្នំពេញ",
-      job: "CUSTOMER",
-      phone: "077777766",
-      email: "",
-      note: "",
-    },
-    {
-      id: "4",
-      name: "លោកស្រី សែន ពិសិដ្ឋយានីតា",
-      gender: "Female",
-      dob: "1985-01-15",
-      idCard: "011249704(01)",
-      address: "ផ្ទះ៩៦ ផ្លូវបេតុង ភូមិស្វាយកាតុក១ សង្កាត់វាលស្បូវ ខណ្ឌច្បារអំពៅ ភ្នំពេញ",
-      job: "N/A",
-      phone: "078570006",
-      email: "N/A",
-      note: "N/A",
-    },
-    {
-      id: "5",
-      name: "លោក សុខ សុវណ្ណឌីន",
-      gender: "Male",
-      dob: "1979-05-10",
-      idCard: "010487222(02)",
-      address: "ផ្ទះR ផ្លូវ៤៥២ ភូមិ ៧ សង្កាត់ទួលទំពូង ខណ្ឌចំការមន ភ្នំពេញ",
-      job: "N/A",
-      phone: "N/A",
-      email: "N/A",
-      note: "N/A",
-    },
-    {
-      id: "6",
-      name: "លោក យ៉ុន រ៉ាដេត",
-      gender: "Male",
-      dob: "1975-04-06",
-      idCard: "010826761",
-      address: "Russey Keo Phnom Penh",
-      job: "N/A",
-      phone: "016296262",
-      email: "N/A",
-      note: "",
-    },
-    {
-      id: "7",
-      name: "លោក ផាន់ សំរិត ឧ",
-      gender: "Male",
-      dob: "1995-12-04",
-      idCard: "090481301(1)",
-      address: "Svay Rieng",
-      job: "N/A",
-      phone: "N/A",
-      email: "",
-      note: "",
-    },
-    {
-      id: "8",
-      name: "វ៉ា ឡុងហៃ",
-      gender: "Male",
-      dob: "1960-01-11",
-      idCard: "011219198",
-      address: "POR SENCHEY PHNOM PENH",
-      job: "N/A",
-      phone: "N/A",
-      email: "",
-      note: "",
-    },
-    {
-      id: "9",
-      name: "លោក សាន សុផាត",
-      gender: "Male",
-      dob: "1988-12-05",
-      idCard: "040268766 (01)",
-      address: "ផ្ទះ 502 ភូមិព្រែកពោធិ៍ខាងជើង ស្រុកទឹកផុស កំពង់ឆ្នាំង",
-      job: "Customer",
-      phone: "016489678",
-      email: "",
-      note: "(Paid Off 78,000$) ABA (54,000$ 29/05/2026) Exchange with Aion Y Plus Yellow 2023 #3015 and Rang Rover white 2014 #1020",
-    },
-    {
-      id: "10",
-      name: "លោក យាង វុទ្ធី",
-      gender: "Male",
-      dob: "1969-03-04",
-      idCard: "051094129 (01)",
-      address: "ផ្ទះ153A ភូមិ1 សង្កាត់អូរបែកក្អម ស្រុកទួលគោក",
-      job: "Customer",
-      phone: "0972220123",
-      email: "",
-      note: "",
-    },
-    {
-      id: "11",
-      name: "លោក ចាន់ ស្រ៊ា",
-      gender: "Male",
-      dob: "1980-01-30",
-      idCard: "160483834",
-      address: "ភូមិប្រទាល ឃុំប្រទាល ស្រុកចង្រៃសៀមរាប",
-      job: "Customer",
-      phone: "N/A",
-      email: "",
-      note: "(PAID OFF) ABA (80,000$ 26/05/2026)",
-    },
-  ]);
+  const [customers, setCustomers] = useState<CustomerItem[]>([]);
   const [viewingCustomer, setViewingCustomer] = useState<CustomerItem | null>(null);
   const [viewingSupplier, setViewingSupplier] = useState<SupplierItem | null>(null);
 
@@ -331,45 +177,15 @@ function SettingsContent() {
         setBrands((brandsData as BrandItem[]) ?? []);
       } else if (tab === "branches") {
         const branchesData = await settingsService.getBranches().catch(() => []);
-        const defaultBranchList: BranchItem[] = [
-          {
-            id: "1",
-            name: "BATTAMBANG",
-            address: "#43A st National 5",
-            phone1: "069234567",
-            phone2: "",
-            note: "",
-          },
-          {
-            id: "2",
-            name: "PHNOM PENH",
-            address: "#42 st Rusia road",
-            phone1: "061 95 5555",
-            phone2: "",
-            note: "",
-          },
-          {
-            id: "7",
-            name: "BOKOR MONIVONG",
-            address: "Phnom Penh",
-            phone1: "N/A",
-            phone2: "N/A",
-            note: "",
-          },
-        ];
-        setBranches(
-          Array.isArray(branchesData) && branchesData.length > 0
-            ? (branchesData as BranchItem[])
-            : defaultBranchList
-        );
+        setBranches(Array.isArray(branchesData) ? (branchesData as BranchItem[]) : []);
       } else if (tab === "countries") {
         const countriesData = await settingsService.getCountries().catch(() => []);
-        if (Array.isArray(countriesData) && countriesData.length > 0) {
+        if (Array.isArray(countriesData)) {
           setCountries(countriesData);
         }
       } else if (tab === "profile" || tab === "companyprofile") {
         const profilesData = await settingsService.getCompanyProfiles().catch(() => []);
-        if (Array.isArray(profilesData) && profilesData.length > 0) {
+        if (Array.isArray(profilesData)) {
           setCompanyProfiles(profilesData as CompanyProfileItem[]);
           if (!selectedProfileId && profilesData[0]?.id) {
             setSelectedProfileId(profilesData[0].id);
@@ -380,63 +196,27 @@ function SettingsContent() {
           settingsService.getSuppliers().catch(() => []),
           customerService.list().catch(() => []),
         ]);
-        const defaultSupplierList: SupplierItem[] = [
-          {
-            id: "1",
-            nameEn: "CHINA DONG FENG MOTOR INDUSTRY IMP&EXP CO., LTD CHINA DONG FENG MOTOR INDUSTRY IMP&EXP CO., LTD",
-            nameKh: "CHINA DONG FENG MOTOR INDUSTRY",
-            category: "car_sale_supplier",
-            country: "CHINA",
-            phone: "+86-27-84301192 / +86-27-84301149",
-            job: "SUPPLIER",
-            gender: "male",
-          },
-          {
-            id: "2",
-            nameEn: "លោក ទៀ សុខា Mr.TEA SOKHA",
-            nameKh: "លោក ទៀ សុខា",
-            category: "car_sale_supplier",
-            country: "CAMBODIA",
-            phone: "N/A",
-            job: "N/A",
-            gender: "male",
-          },
-          {
-            id: "3",
-            nameEn: "លោក ម៉ែន សុខ Mr.MEN SOK",
-            nameKh: "លោក ម៉ែន សុខ",
-            category: "car_sale_supplier",
-            country: "CAMBODIA",
-            phone: "011800889",
-            job: "Customer",
-            gender: "male",
-          },
-        ];
 
         setSuppliers(
-          Array.isArray(suppliersData) &&
-          suppliersData.length > 0 &&
-          (suppliersData as SupplierItem[]).some((s) => s.nameEn?.includes("CHINA DONG FENG"))
-            ? (suppliersData as SupplierItem[])
-            : defaultSupplierList
+          Array.isArray(suppliersData) ? (suppliersData as SupplierItem[]) : []
         );
 
-        if (Array.isArray(customersData) && customersData.length > 0) {
-          setCustomers(
-            customersData.map((c: any) => ({
-              id: c.id,
-              name: c.name,
-              gender: c.gender || "Female",
-              dob: c.dob ? new Date(c.dob).toLocaleDateString() : "",
-              idCard: c.idCard || "",
-              address: c.address || "",
-              job: c.job || "N/A",
-              phone: c.phone || "",
-              email: c.email || "",
-              note: c.note || "",
-            }))
-          );
-        }
+        setCustomers(
+          Array.isArray(customersData)
+            ? customersData.map((c: any) => ({
+                id: c.id,
+                name: c.name,
+                gender: c.gender || "Female",
+                dob: c.dob ? new Date(c.dob).toLocaleDateString() : "",
+                idCard: c.idCard || "",
+                address: c.address || "",
+                job: c.job || "N/A",
+                phone: c.phone || "",
+                email: c.email || "",
+                note: c.note || "",
+              }))
+            : []
+        );
       }
       loadedTabs.current.add(tab);
     } catch (err: unknown) {

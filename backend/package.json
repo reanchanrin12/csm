@@ -9,6 +9,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "prisma:clean": "ts-node prisma/clean-test-data.ts",
     "tsc": "tsc --noEmit"
   },
   "dependencies": {
