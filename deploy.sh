@@ -13,8 +13,8 @@ git pull
 
 echo "📦 [2/5] Installing dependencies..."
 npm install
-# Ensure Tailwind CSS / LightningCSS linux native binary is present on Linux servers
-npm install -w csm-web lightningcss-linux-x64-gnu@1.32.0 --no-save 2>/dev/null || true
+# Ensure Tailwind CSS Oxide & LightningCSS linux native binaries are present on Linux servers
+npm install -w csm-web @tailwindcss/oxide-linux-x64-gnu@4.3.3 lightningcss-linux-x64-gnu@1.32.0 --no-save 2>/dev/null || true
 
 echo "🔨 [3/5] Building contracts & backend..."
 npm run build:contracts
