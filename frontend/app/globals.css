@@ -185,3 +185,26 @@ body {
 .font-khmer {
   font-family: 'Kantumruy Pro', 'Siemreap', 'Khmer OS Battambang', 'Hanuman', sans-serif;
 }
+
+@media print {
+  header,
+  aside,
+  nav,
+  .no-print {
+    display: none !important;
+  }
+  body,
+  html,
+  main {
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm;
+  }
+}

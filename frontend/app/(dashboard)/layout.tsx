@@ -14,7 +14,7 @@ export default function DashboardLayout({
     <div className="min-h-screen flex flex-col bg-[#f0f2f5] font-sans antialiased">
 
       {/* 1. Full-Width Top Navbar with M-HERO & VOYAH Brand & Automotive Dark Header */}
-      <header className="h-[56px] w-full bg-[#070c18] border-b border-[#162138] flex items-center justify-between px-5 sticky top-0 z-50 shadow-md relative overflow-hidden">
+      <header className="h-[56px] w-full bg-[#070c18] border-b border-[#162138] flex items-center justify-between px-5 sticky top-0 z-50 shadow-md relative overflow-hidden print:hidden">
         {/* Cockpit ambient lighting overlay */}
         <div className="absolute inset-0 bg-gradient-to-r from-[#030611] via-[#0c162e] to-[#040816] pointer-events-none" />
         <div className="absolute inset-y-0 left-36 w-96 bg-blue-600/10 blur-2xl pointer-events-none" />
@@ -41,15 +41,15 @@ export default function DashboardLayout({
       </header>
 
       {/* 2. Main Body: Left Sidebar + Right Content Area */}
-      <div className="flex flex-1 min-h-[calc(100vh-56px)]">
+      <div className="flex flex-1 min-h-[calc(100vh-56px)] print:min-h-0 print:block">
         {/* Left Dark Sidebar matching CSM 1.0 */}
-        <aside className="w-[220px] sm:w-[240px] bg-[#0c1322] border-r border-[#1a233a] flex flex-col shrink-0 sticky top-[56px] h-[calc(100vh-56px)] z-40">
+        <aside className="w-[220px] sm:w-[240px] bg-[#0c1322] border-r border-[#1a233a] flex flex-col shrink-0 sticky top-[56px] h-[calc(100vh-56px)] z-40 print:hidden">
           {/* 14 Menu List */}
           <SidebarNav />
         </aside>
 
         {/* Right Main Content protected by RouteGuard */}
-        <main className="flex-1 bg-white p-5 sm:p-6 overflow-y-auto">
+        <main className="flex-1 bg-white p-5 sm:p-6 overflow-y-auto print:p-0 print:m-0 print:bg-white print:overflow-visible">
           <RouteGuard>{children}</RouteGuard>
         </main>
       </div>

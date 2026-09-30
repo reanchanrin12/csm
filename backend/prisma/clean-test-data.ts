@@ -27,12 +27,15 @@ async function cleanTestData() {
   const delCustomers = await prisma.customer.deleteMany();
   console.log(`✓ Deleted ${delCustomers.count} test customers.`);
 
+  const delSuppliers = await prisma.supplier.deleteMany();
+  console.log(`✓ Deleted ${delSuppliers.count} test suppliers.`);
+
   const delExpenses = await prisma.operatingExpense.deleteMany();
   console.log(`✓ Deleted ${delExpenses.count} operating expenses.`);
 
   console.log('\n=============================================');
   console.log('✅ TEST DATA CLEANED SUCCESSFULLY!');
-  console.log('🛡️ Preserved: Users, Employees, Branches, CarBrands, CarModels, Suppliers.');
+  console.log('🛡️ Preserved: Users, Employees, Branches, CarBrands, CarModels.');
   console.log('=============================================');
 }
 

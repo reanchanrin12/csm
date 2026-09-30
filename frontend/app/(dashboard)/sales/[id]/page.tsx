@@ -241,9 +241,9 @@ export default function SoldCarDetailPage() {
   const balance = Math.max(0, order.soldPrice - totalPaid);
 
   return (
-    <div className="p-6 bg-white min-h-screen text-[#333333] space-y-5">
+    <div className="p-6 bg-white min-h-screen text-[#333333] space-y-5 print:p-0 print:m-0 print:space-y-0 print:min-h-0">
       {/* 1. Breadcrumb Bar */}
-      <div className="bg-[#f5f5f5] border border-[#e3e3e3] rounded px-4 py-2.5 flex items-center justify-between text-xs text-[#777777]">
+      <div className="bg-[#f5f5f5] border border-[#e3e3e3] rounded px-4 py-2.5 flex items-center justify-between text-xs text-[#777777] print:hidden">
         <div className="flex items-center gap-1.5 font-sans">
           <TableProperties className="h-3.5 w-3.5 text-[#337ab7]" />
           <Link href="/" className="text-[#337ab7] hover:underline">
@@ -286,46 +286,48 @@ export default function SoldCarDetailPage() {
 
       {/* Notifications */}
       {successMsg && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded flex items-center gap-2">
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded flex items-center gap-2 print:hidden">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
           <span>{successMsg}</span>
         </div>
       )}
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 text-red-800 text-xs rounded flex items-center gap-2">
+        <div className="p-3 bg-red-50 border border-red-200 text-red-800 text-xs rounded flex items-center gap-2 print:hidden">
           <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
           <span>{error}</span>
         </div>
       )}
 
-      {/* 2. Top Header & Title Banner */}
-      <div className="flex items-start justify-between border-b pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-[#333333] tracking-tight">
-            {order.vehicle.brand} : {order.vehicle.model}
-          </h1>
-          <div className="flex items-center gap-3 mt-2 text-xs">
-            <span className="inline-flex items-center gap-1 bg-[#d9534f] text-white font-bold px-2.5 py-1 rounded text-xs shadow-sm">
-              <ShoppingCart className="h-3.5 w-3.5" /> Sold out: $
-              {order.soldPrice.toLocaleString()}
-            </span>
-            <span className="text-[#777777] font-medium">
-              Price: $
-              {(
-                order.vehicle.inSalePrice || order.soldPrice
-              ).toLocaleString(undefined, { minimumFractionDigits: 2 })}{" "}
-              | Balance: ${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-            </span>
+      {/* 2. Top Header & Title Banner (Only in Details mode) */}
+      {viewMode === "details" && (
+        <div className="flex items-start justify-between border-b pb-4 print:hidden">
+          <div>
+            <h1 className="text-2xl font-bold text-[#333333] tracking-tight">
+              {order.vehicle.brand} : {order.vehicle.model}
+            </h1>
+            <div className="flex items-center gap-3 mt-2 text-xs">
+              <span className="inline-flex items-center gap-1 bg-[#d9534f] text-white font-bold px-2.5 py-1 rounded text-xs shadow-sm">
+                <ShoppingCart className="h-3.5 w-3.5" /> Sold out: $
+                {order.soldPrice.toLocaleString()}
+              </span>
+              <span className="text-[#777777] font-medium">
+                Price: $
+                {(
+                  order.vehicle.inSalePrice || order.soldPrice
+                ).toLocaleString(undefined, { minimumFractionDigits: 2 })}{" "}
+                | Balance: ${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </span>
+            </div>
           </div>
-        </div>
 
-        <Link
-          href="/sales"
-          className="px-3 py-1.5 text-xs bg-white hover:bg-slate-50 border border-slate-300 rounded text-slate-700 flex items-center gap-1"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" /> Back to list
-        </Link>
-      </div>
+          <Link
+            href="/sales"
+            className="px-3 py-1.5 text-xs bg-white hover:bg-slate-50 border border-slate-300 rounded text-slate-700 flex items-center gap-1"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to list
+          </Link>
+        </div>
+      )}
 
       {viewMode === "details" ? (
         <>
@@ -617,7 +619,25 @@ export default function SoldCarDetailPage() {
         </>
       ) : (
         /* Printable Official Invoice View */
-        <div className="bg-white border rounded p-8 shadow-sm print:border-none print:shadow-none print:p-0">
+        <div className="space-y-4 print:space-y-0">
+          <div className="flex items-center justify-between bg-slate-100 border border-slate-200 rounded px-4 py-2.5 text-xs print:hidden">
+            <button
+              type="button"
+              onClick={() => setViewMode("details")}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded text-slate-700 font-semibold transition-colors"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" /> Back to Details &amp; Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-[#337ab7] hover:bg-[#286090] text-white font-semibold rounded shadow-sm transition-colors"
+            >
+              <Printer className="h-3.5 w-3.5" /> Print Invoice
+            </button>
+          </div>
+
+          <div className="bg-white border rounded p-8 shadow-sm print:border-none print:shadow-none print:p-0 print:m-0 w-full max-w-[850px] mx-auto print:max-w-none">
           <div className="flex justify-between items-start border-b pb-6">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
@@ -757,6 +777,7 @@ export default function SoldCarDetailPage() {
             </div>
           </div>
         </div>
+      </div>
       )}
     </div>
   );
