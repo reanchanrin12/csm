@@ -20,8 +20,11 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "CSM - Car Showroom Management",
-  description: "Modern Car Showroom & Sales Management System",
+  title: "WINWAY - Car Showroom Management",
+  description: "WINWAY Car Showroom & Sales Management System",
+  icons: {
+    icon: "/images/WINWAY.png",
+  },
 };
 
 export default function RootLayout({

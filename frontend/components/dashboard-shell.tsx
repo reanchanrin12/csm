@@ -33,17 +33,20 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
           <Link
             href="/"
-            className="flex items-center py-1 hover:opacity-90 transition-opacity"
-            title="ទៅកាន់ Dashboard"
+            className="flex items-center gap-2.5 py-1 hover:opacity-90 transition-opacity"
+            title="WINWAY Dashboard"
           >
             <Image
-              src="/images/logo-mhero-voyah-white.png"
-              alt="M-HERO & VOYAH"
-              width={200}
-              height={40}
-              className="h-7 sm:h-9 md:h-[40px] w-auto object-contain brightness-0 invert select-none drop-shadow-sm"
+              src="/images/WINWAY.png"
+              alt="WINWAY"
+              width={160}
+              height={36}
+              className="h-8 sm:h-9 w-auto object-contain select-none drop-shadow-sm"
               priority
             />
+            <span className="font-black text-sm sm:text-base tracking-[0.18em] text-white">
+              WINWAY
+            </span>
           </Link>
         </div>
 

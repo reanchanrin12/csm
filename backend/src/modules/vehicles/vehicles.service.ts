@@ -27,8 +27,8 @@ export class VehiclesService {
         },
       }),
       this.prisma.supplier.findMany({
-        where: { category: 'VEHICLE' },
-        select: { id: true, nameEn: true, nameKh: true },
+        orderBy: [{ category: 'asc' }, { nameEn: 'asc' }],
+        select: { id: true, nameEn: true, nameKh: true, category: true },
       }),
     ]);
 
@@ -254,7 +254,11 @@ export class VehiclesService {
         }
       });
 
-      const extraCosts = clearanceCost + taxCost + transportCost + containerCost + laborCost + repairCost;
+      // Sum all vehicle cost items to ensure no category (including ACCESSORY) is dropped
+      const extraCosts = v.costItems.reduce(
+        (sum, item) => sum + Number(item.amount),
+        0,
+      );
       const totalLandedCost = Number(v.purchaseCost) + extraCosts;
 
       return {

@@ -289,8 +289,8 @@ function MonthlyExpensesView() {
           )}
 
           {/* Row 1: Select Date */}
-          <div className="flex items-center gap-4">
-            <div className="w-36 flex items-center gap-2 text-[12px] font-bold text-[#1f3a60]">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4">
+            <div className="w-full sm:w-36 flex items-center gap-2 text-[12px] font-bold text-[#1f3a60]">
               <Calendar className="h-4 w-4 text-slate-500" />
               <span>Select Date</span>
             </div>
@@ -300,13 +300,13 @@ function MonthlyExpensesView() {
               value={expenseDate}
               onChange={(e) => setExpenseDate(e.target.value)}
               required
-              className="w-[260px] h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
+              className="w-full sm:w-[260px] h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
             />
           </div>
 
           {/* Row 2: Expense To */}
-          <div className="flex items-center gap-4">
-            <div className="w-36 flex items-center gap-2 text-[12px] font-bold text-[#1f3a60]">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4">
+            <div className="w-full sm:w-36 flex items-center gap-2 text-[12px] font-bold text-[#1f3a60]">
               <LayoutGrid className="h-4 w-4 text-slate-500" />
               <span>Expense To</span>
             </div>
@@ -317,13 +317,13 @@ function MonthlyExpensesView() {
               value={expenseTo}
               onChange={(e) => setExpenseTo(e.target.value)}
               required
-              className="w-[260px] h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
+              className="w-full sm:w-[260px] h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
             />
           </div>
 
           {/* Row 3: Payment Amount */}
-          <div className="flex items-center gap-4">
-            <div className="w-36 flex items-center gap-2 text-[12px] font-bold text-[#1f3a60]">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4">
+            <div className="w-full sm:w-36 flex items-center gap-2 text-[12px] font-bold text-[#1f3a60]">
               <DollarSign className="h-4 w-4 text-slate-500" />
               <span>Payment Amount</span>
             </div>
@@ -338,13 +338,13 @@ function MonthlyExpensesView() {
                 setAmount(e.target.value === "" ? "" : Number(e.target.value))
               }
               required
-              className="w-[260px] h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
+              className="w-full sm:w-[260px] h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
             />
           </div>
 
           {/* Row 4: Detail */}
-          <div className="flex items-start gap-4">
-            <div className="w-36 flex items-center gap-2 text-[12px] font-bold text-[#1f3a60] pt-1">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-1.5 sm:gap-4">
+            <div className="w-full sm:w-36 flex items-center gap-2 text-[12px] font-bold text-[#1f3a60] pt-1">
               <MessageSquare className="h-4 w-4 text-slate-500" />
               <span>Detail</span>
             </div>
@@ -354,17 +354,17 @@ function MonthlyExpensesView() {
               placeholder="some node about this expense on"
               value={details}
               onChange={(e) => setDetails(e.target.value)}
-              className="w-[360px] p-2 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff] resize-none"
+              className="w-full sm:w-[360px] p-2 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff] resize-none"
             />
           </div>
 
           {/* Row 5: Save Expense Button */}
-          <div className="flex items-center gap-4 pt-1">
-            <div className="w-36" />
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 pt-1">
+            <div className="hidden sm:block sm:w-36" />
             <button
               type="submit"
               disabled={submitting}
-              className="h-[32px] px-4 text-xs font-semibold bg-[#1976d2] hover:bg-[#1565c0] text-white rounded-[2px] flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="h-[32px] px-4 text-xs font-semibold bg-[#1976d2] hover:bg-[#1565c0] text-white rounded-[2px] flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <PlusCircle className="h-3.5 w-3.5" />
               <span>{submitting ? "Saving..." : "Save Expense"}</span>
@@ -386,14 +386,14 @@ function MonthlyExpensesView() {
             type="date"
             value={filterStartDate}
             onChange={(e) => setFilterStartDate(e.target.value)}
-            className="w-48 h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
+            className="w-full sm:w-48 h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
           />
 
           <input
             type="date"
             value={filterEndDate}
             onChange={(e) => setFilterEndDate(e.target.value)}
-            className="w-48 h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
+            className="w-full sm:w-48 h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
           />
 
           <button

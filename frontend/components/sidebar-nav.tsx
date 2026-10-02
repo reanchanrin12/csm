@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { isRouteAllowed } from "@/lib/rbac";
 import type { UserRole } from "@csm/contracts";
 import {
   PieChart,
@@ -22,6 +23,8 @@ import {
   Ship,
   Receipt,
   ChevronDown,
+  Package,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -146,7 +149,7 @@ const csmNavSections: NavSection[] = [
         roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"],
         subItems: [
           { name: "Bank Loan List", href: "/finance?tab=bank-loans" },
-          { name: "Loan Repayment", href: "/schedule" },
+          { name: "Loan Repayments Report", href: "/reports/loans" },
         ],
       },
     ],
@@ -156,44 +159,39 @@ const csmNavSections: NavSection[] = [
     items: [
       {
         name: "Sales Reports",
-        icon: FileText,
+        href: "/reports/sales",
+        icon: TrendingUp,
         roles: ["SUPER_ADMIN", "ADMIN", "SALE", "ACCOUNTANT"],
-        subItems: [
-          { name: "Sale Details", href: "/reports?tab=sales&view=details" },
-          { name: "Sale Summary", href: "/reports?tab=sales&view=summary" },
-        ],
       },
       {
         name: "Expense Reports",
-        icon: FileText,
+        href: "/reports/expenses",
+        icon: Receipt,
         roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"],
-        subItems: [
-          { name: "Expense Details", href: "/reports?tab=expenses&view=details" },
-          { name: "Expense Summary", href: "/reports?tab=expenses&view=summary" },
-        ],
       },
       {
-        name: "Stock / Purchased Reports",
-        icon: FileText,
+        name: "Stock / Purchased",
+        href: "/reports/inventory",
+        icon: Package,
         roles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "ACCOUNTANT"],
-        subItems: [
-          { name: "Stock List", href: "/reports?tab=inventory&view=stock" },
-          { name: "Purchased Report", href: "/reports?tab=inventory&view=purchased" },
-        ],
       },
       {
-        name: "Other Reports",
-        icon: FileText,
+        name: "Logistics & Costs",
+        href: "/reports/logistics",
+        icon: Truck,
+        roles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "ACCOUNTANT"],
+      },
+      {
+        name: "Loan Repayments",
+        href: "/reports/loans",
+        icon: CreditCard,
         roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"],
-        subItems: [
-          { name: "Arrears Payment", href: "/reports?tab=loans&view=arrears" },
-          { name: "History Payment", href: "/reports?tab=loans&view=history" },
-          { name: "Bank Payment", href: "/reports?tab=loans&view=bank" },
-          { name: "Shipping", href: "/reports?tab=logistics&category=TRANSPORT" },
-          { name: "Tax & Clearance", href: "/reports?tab=logistics&category=TAX" },
-          { name: "Repair", href: "/reports?tab=logistics&category=REPAIR" },
-          { name: "Other expenses", href: "/reports?tab=expenses" },
-        ],
+      },
+      {
+        name: "Parts & Repairs",
+        href: "/reports/repairs",
+        icon: Wrench,
+        roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT", "TECHNICIAN", "STOCK_CONTROLLER"],
       },
     ],
   },
@@ -213,8 +211,30 @@ function SidebarNavContent({ onNavigate }: SidebarNavProps) {
   const currentRole = user?.role || "SALE";
 
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
+  const [sectionsOpen, setSectionsOpen] = useState<Record<string, boolean>>({
+    REPORTS: true,
+  });
 
-  const isRoleAllowed = (allowedRoles?: UserRole[]) => {
+  const activeItemRef = React.useRef<HTMLAnchorElement | null>(null);
+
+  useEffect(() => {
+    // Automatically scroll active navigation item into view so REPORTS never gets cut off
+    if (activeItemRef.current) {
+      activeItemRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [pathname, searchParams]);
+
+  const toggleSection = (title: string) => {
+    setSectionsOpen((prev) => ({
+      ...prev,
+      [title]: prev[title] === false ? true : false,
+    }));
+  };
+
+  const isRoleAllowed = (allowedRoles?: UserRole[], href?: string) => {
+    // 1. Centralized route permission check to auto-hide restricted links
+    if (href && !isRouteAllowed(href, currentRole)) return false;
+    // 2. Custom component roles check
     if (!allowedRoles || allowedRoles.length === 0) return true;
     if (currentRole === "SUPER_ADMIN") return true;
     return allowedRoles.includes(currentRole);
@@ -225,10 +245,10 @@ function SidebarNavContent({ onNavigate }: SidebarNavProps) {
     return csmNavSections
       .map((section) => {
         const filteredItems = section.items
-          .filter((item) => isRoleAllowed(item.roles))
+          .filter((item) => isRoleAllowed(item.roles, item.href))
           .map((item) => {
             if (!item.subItems) return item;
-            const filteredSubs = item.subItems.filter((sub) => isRoleAllowed(sub.roles));
+            const filteredSubs = item.subItems.filter((sub) => isRoleAllowed(sub.roles, sub.href));
             return { ...item, subItems: filteredSubs };
           })
           .filter((item) => !item.subItems || item.subItems.length > 0);
@@ -290,115 +310,155 @@ function SidebarNavContent({ onNavigate }: SidebarNavProps) {
   };
 
   return (
-    <nav className="flex-1 px-2.5 py-2 space-y-1 overflow-y-auto text-[13px] select-none text-slate-300">
-      {visibleSections.map((section, sectionIdx) => (
-        <div key={section.title || sectionIdx} className="space-y-0.5">
-          {section.title && (
-            <div className="px-3 pt-4 pb-1.5 border-t border-[#1a233a] mt-2">
-              <p className="text-[12px] font-bold uppercase tracking-wider text-slate-100">
-                {section.title}
-              </p>
-            </div>
-          )}
+    <div className="flex flex-col h-full">
+      {/* Welcome Banner matching CSM 1.0 */}
+      <div className="px-4 py-3 border-b border-[#162035] shrink-0 bg-[#0a101d]">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[15px] font-bold text-white tracking-tight">
+            WINWAY Showroom
+          </h2>
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-semibold text-emerald-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Live
+          </span>
+        </div>
+        <p className="text-[11px] text-slate-400 mt-0.5">Car Showroom Management System v1.0</p>
+      </div>
 
-          {section.items.map((item) => {
-            const Icon = item.icon;
-            const hasSub = !!item.subItems && item.subItems.length > 0;
-            const isOpen = !!openItems[item.name];
+      <nav className="flex-1 px-2.5 py-2.5 pb-40 space-y-1 overflow-y-auto text-[13px] select-none text-slate-300 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-slate-700/60 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [scrollbar-width:thin] [scrollbar-color:#334155_transparent]">
+        {visibleSections.map((section, sectionIdx) => {
+          const isSectionOpen = section.title ? sectionsOpen[section.title] !== false : true;
 
-            // Check if top-level item is active
-            const isActive = item.href ? isMatchHref(item.href) : false;
-
-            // Check if any sub-item is currently active
-            const hasActiveChild =
-              hasSub &&
-              item.subItems!.some((sub) => isMatchHref(sub.href));
-
-            if (hasSub) {
-              return (
-                <div key={item.name} className="space-y-0.5">
-                  <button
-                    type="button"
-                    onClick={() => toggleItem(item.name)}
+          return (
+            <div key={section.title || sectionIdx} className="space-y-0.5">
+              {section.title && (
+                <button
+                  type="button"
+                  onClick={() => toggleSection(section.title!)}
+                  className="w-full flex items-center justify-between px-3 pt-3.5 pb-1.5 border-t border-[#162035] mt-2 group cursor-pointer text-left"
+                >
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-sky-400 transition-colors">
+                    {section.title}
+                  </p>
+                  <ChevronDown
                     className={cn(
-                      "w-full flex items-center justify-between px-3 py-2 rounded text-[13px] transition-colors cursor-pointer",
-                      hasActiveChild
-                        ? "text-white bg-[#141e33] font-medium"
-                        : "text-slate-300 hover:text-white hover:bg-[#121a2d]"
+                      "h-3.5 w-3.5 text-slate-500 transition-transform duration-200",
+                      isSectionOpen ? "rotate-0" : "-rotate-90"
                     )}
-                  >
-                    <div className="flex items-center gap-2.5 truncate">
+                  />
+                </button>
+              )}
+
+              {isSectionOpen &&
+                section.items.map((item) => {
+                  const Icon = item.icon;
+                  const hasSub = !!item.subItems && item.subItems.length > 0;
+                  const isOpen = !!openItems[item.name];
+
+                  // Check if top-level item is active
+                  const isActive = item.href ? isMatchHref(item.href) : false;
+
+                  // Check if any sub-item is currently active
+                  const hasActiveChild =
+                    hasSub &&
+                    item.subItems!.some((sub) => isMatchHref(sub.href));
+
+                  if (hasSub) {
+                    return (
+                      <div key={item.name} className="space-y-0.5">
+                        <button
+                          type="button"
+                          onClick={() => toggleItem(item.name)}
+                          className={cn(
+                            "w-full flex items-center justify-between px-3 py-2 rounded-xl text-[13px] transition-all cursor-pointer",
+                            hasActiveChild
+                              ? "text-white bg-[#131d31] font-medium"
+                              : "text-slate-300 hover:text-white hover:bg-slate-800/40"
+                          )}
+                        >
+                          <div className="flex items-center gap-2.5 truncate">
+                            <Icon
+                              className={cn(
+                                "h-4 w-4 shrink-0 transition-colors",
+                                hasActiveChild ? "text-sky-400" : "text-slate-400"
+                              )}
+                            />
+                            <span className="truncate">{item.name}</span>
+                          </div>
+                          <ChevronDown
+                            className={cn(
+                              "h-3.5 w-3.5 text-slate-400 transition-transform duration-200 shrink-0",
+                              isOpen && "rotate-180"
+                            )}
+                          />
+                        </button>
+
+                        {/* Dropdown submenu */}
+                        {isOpen && (
+                          <div className="pl-3 pr-1 py-1 space-y-0.5 border-l border-slate-700/60 ml-4.5 my-0.5">
+                            {item.subItems!.map((sub) => {
+                              const isSubActive = isMatchHref(sub.href);
+
+                              return (
+                                <Link
+                                  key={sub.name}
+                                  ref={isSubActive ? activeItemRef : undefined}
+                                  href={sub.href}
+                                  onClick={() => onNavigate?.()}
+                                  className={cn(
+                                    "flex items-center px-2.5 py-1.5 rounded-lg text-[12px] transition-all truncate",
+                                    isSubActive
+                                      ? "bg-sky-500/15 text-sky-300 font-semibold shadow-xs"
+                                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+                                  )}
+                                >
+                                  <span
+                                    className={cn(
+                                      "w-1.5 h-1.5 rounded-full mr-2.5 shrink-0 transition-all",
+                                      isSubActive ? "bg-sky-400 ring-2 ring-sky-400/30" : "bg-slate-600"
+                                    )}
+                                  />
+                                  <span className="truncate">{sub.name}</span>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // Standalone Link (like Calculator, Dashboard, Schedule, or Reports items)
+                  return (
+                    <Link
+                      key={item.name}
+                      ref={isActive ? activeItemRef : undefined}
+                      href={item.href || "#"}
+                      title={item.name}
+                      onClick={() => onNavigate?.()}
+                      className={cn(
+                        "relative flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] transition-all duration-150",
+                        isActive
+                          ? "bg-gradient-to-r from-sky-500/15 via-blue-600/10 to-transparent text-sky-400 font-semibold border-l-[3px] border-sky-400 pl-[9px] shadow-[0_0_12px_rgba(56,189,248,0.08)]"
+                          : "border-l-[3px] border-transparent text-slate-300 hover:text-white hover:bg-slate-800/40"
+                      )}
+                    >
                       <Icon
                         className={cn(
-                          "h-4 w-4 shrink-0",
-                          hasActiveChild ? "text-[#38bdf8]" : "text-slate-400"
+                          "h-4 w-4 shrink-0 transition-colors",
+                          isActive ? "text-sky-400" : "text-slate-400"
                         )}
                       />
                       <span className="truncate">{item.name}</span>
-                    </div>
-                    <ChevronDown
-                      className={cn(
-                        "h-3.5 w-3.5 text-slate-400 transition-transform duration-200 shrink-0",
-                        isOpen && "rotate-180"
-                      )}
-                    />
-                  </button>
-
-                  {/* Dropdown submenu */}
-                  {isOpen && (
-                    <div className="pl-6 pr-1 py-1 space-y-0.5 border-l border-[#1a233a] ml-4">
-                      {item.subItems!.map((sub) => {
-                        const isSubActive = isMatchHref(sub.href);
-
-                        return (
-                          <Link
-                            key={sub.name}
-                            href={sub.href}
-                            onClick={() => onNavigate?.()}
-                            className={cn(
-                              "block px-2.5 py-1.5 rounded-[2px] text-[12px] transition-colors truncate",
-                              isSubActive
-                                ? "border border-[#55647e] text-white bg-[#060b17] font-medium"
-                                : "border border-transparent text-slate-400 hover:text-white hover:bg-[#11192b]"
-                            )}
-                          >
-                            {sub.name}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            }
-
-            // Standalone Link (like Calculator, Dashboard, Schedule)
-            return (
-              <Link
-                key={item.name}
-                href={item.href || "#"}
-                onClick={() => onNavigate?.()}
-                className={cn(
-                  "flex items-center gap-2.5 px-3 py-2 rounded text-[13px] transition-all",
-                  isActive
-                    ? "border border-[#38bdf8] text-white font-medium bg-[#142036] shadow-sm"
-                    : "border border-transparent text-slate-300 hover:text-white hover:bg-[#121a2d]"
-                )}
-              >
-                <Icon
-                  className={cn(
-                    "h-4 w-4 shrink-0",
-                    isActive ? "text-[#38bdf8]" : "text-slate-400"
-                  )}
-                />
-                <span className="truncate">{item.name}</span>
-              </Link>
-            );
-          })}
-        </div>
-      ))}
-    </nav>
-  );
+                    </Link>
+                  );
+                })}
+            </div>
+          );
+        })}
+      </nav>
+  </div>
+);
 }
 
 export function SidebarNav({ onNavigate }: SidebarNavProps = {}) {

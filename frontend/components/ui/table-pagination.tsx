@@ -3,6 +3,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface TablePaginationProps {
   currentPage: number;
@@ -46,12 +47,15 @@ export function TablePagination({
 
   return (
     <div
-      className={`p-3 border-t border-border/70 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground ${className}`}
+      className={cn(
+        "p-3.5 bg-slate-50/80 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-medium",
+        className
+      )}
     >
       <div>
-        Showing <strong className="text-foreground">{startItem}</strong> to{" "}
-        <strong className="text-foreground">{endItem}</strong> of{" "}
-        <strong className="text-foreground">{totalItems}</strong> entries
+        បង្ហាញពី <strong className="font-semibold text-slate-800">{startItem}</strong> ដល់{" "}
+        <strong className="font-semibold text-slate-800">{endItem}</strong> នៃទិន្នន័យសរុប{" "}
+        <strong className="font-semibold text-slate-800">{totalItems}</strong> កំណត់ត្រា
       </div>
 
       <div className="flex items-center gap-1">
@@ -61,7 +65,7 @@ export function TablePagination({
           size="sm"
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
           disabled={currentPage <= 1}
-          className="h-8 text-xs px-2.5 gap-1"
+          className="h-8 text-xs px-2.5 gap-1 border-slate-200 text-slate-700 hover:bg-slate-100 disabled:opacity-40 cursor-pointer"
         >
           <ChevronLeft className="h-3.5 w-3.5" />
           <span>Previous</span>
@@ -78,10 +82,10 @@ export function TablePagination({
                 key={p}
                 type="button"
                 onClick={() => onPageChange(p)}
-                className={`h-8 min-w-[32px] px-2 text-xs font-medium rounded-md border transition-colors cursor-pointer ${
+                className={`h-8 min-w-[32px] px-2 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
                   currentPage === p
-                    ? "bg-[#1c64f2] text-white border-[#1c64f2]"
-                    : "bg-white dark:bg-card border-border/70 text-foreground hover:bg-muted"
+                    ? "bg-[#1c3d73] text-white border-[#1c3d73] shadow-xs"
+                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
                 }`}
               >
                 {p}
@@ -96,7 +100,7 @@ export function TablePagination({
           size="sm"
           onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
           disabled={currentPage >= totalPages}
-          className="h-8 text-xs px-2.5 gap-1"
+          className="h-8 text-xs px-2.5 gap-1 border-slate-200 text-slate-700 hover:bg-slate-100 disabled:opacity-40 cursor-pointer"
         >
           <span>Next</span>
           <ChevronRight className="h-3.5 w-3.5" />

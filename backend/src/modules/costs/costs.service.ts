@@ -42,12 +42,13 @@ export class CostsService {
         orderBy: { nameEn: 'asc' },
       }),
       this.prisma.vehicle.findMany({
-        where: { status: 'IN_STOCK' },
+        where: { status: { not: 'SOLD' } },
         select: {
           id: true,
           vin: true,
           madeYear: true,
           exteriorColor: true,
+          status: true,
           model: {
             select: {
               name: true,
@@ -68,7 +69,8 @@ export class CostsService {
         model: v.model.name,
         madeYear: v.madeYear,
         color: v.exteriorColor,
-        displayName: `${v.madeYear} ${v.model.brand.name} ${v.model.name} (${v.vin})`,
+        status: v.status,
+        displayName: `${v.madeYear} ${v.model.brand.name} ${v.model.name} (${v.vin}) - [${v.status}]`,
       })),
     };
   }
@@ -305,9 +307,7 @@ export class CostsService {
       const totalPrice = Number(v.purchaseCost);
 
       const purchaseBill = v.costItems.find((ci) => ci.bill?.billNumber.startsWith('BU'))?.bill;
-      const paidAmount = purchaseBill
-        ? Number(purchaseBill.paidAmount)
-        : Math.max(0, totalPrice - 1.0);
+      const paidAmount = purchaseBill ? Number(purchaseBill.paidAmount) : 0;
       const balance = Math.max(0, totalPrice - paidAmount);
 
       return {
@@ -355,9 +355,83 @@ export class CostsService {
       });
     }
 
-    return {
-      success: true,
-      message: `Payment of $${dto.amount} successfully recorded for vehicle ${vehicle.vin}`,
-    };
+    // Persist a dedicated purchase bill and link to vehicle cost items
+    return this.prisma.$transaction(async (tx) => {
+      const bill = await tx.landedCostBill.create({
+        data: {
+          billNumber: `BU-${vehicle.vin.slice(-6)}-${Date.now().toString().slice(-4)}`,
+          supplierId: vehicle.supplierId,
+          category: 'TAX',
+          totalAmount: vehicle.purchaseCost,
+          paidAmount: dto.amount,
+          billDate: dto.paidDate ? new Date(dto.paidDate) : new Date(),
+          description: dto.comment || 'Vehicle purchase supplier settlement',
+        },
+      });
+
+      await tx.vehicleCostItem.create({
+        data: {
+          vehicleId: vehicle.id,
+          costType: 'TAX',
+          amount: 0,
+          billId: bill.id,
+          note: 'Supplier purchase invoice settlement',
+        },
+      });
+
+      return {
+        success: true,
+        billId: bill.id,
+        message: `Payment of $${dto.amount} successfully recorded for vehicle ${vehicle.vin}`,
+      };
+    });
+  }
+
+  // 5. Get spare parts & repairs report (filtered by category REPAIR & ACCESSORY)
+  async getPartsAndRepairsReport() {
+    const items = await this.prisma.vehicleCostItem.findMany({
+      where: {
+        costType: { in: ['REPAIR', 'ACCESSORY'] },
+      },
+      include: {
+        vehicle: {
+          select: {
+            id: true,
+            vin: true,
+            madeYear: true,
+            exteriorColor: true,
+            status: true,
+            currentBranch: { select: { name: true } },
+            model: {
+              select: {
+                name: true,
+                brand: { select: { name: true } },
+              },
+            },
+          },
+        },
+        bill: {
+          include: {
+            supplier: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return items.map((item) => ({
+      id: item.id,
+      costType: item.costType,
+      amount: Number(item.amount),
+      note: item.note || '-',
+      createdAt: item.createdAt.toISOString(),
+      billNumber: item.bill?.billNumber || 'N/A',
+      billDate: item.bill?.billDate ? item.bill.billDate.toISOString() : item.createdAt.toISOString(),
+      supplierName: item.bill?.supplier ? (item.bill.supplier.nameKh || item.bill.supplier.nameEn) : 'ទូទៅ / ជាងខាងក្រៅ',
+      vehicleVin: item.vehicle.vin,
+      vehicleName: `${item.vehicle.madeYear} ${item.vehicle.model.brand.name} ${item.vehicle.model.name}`,
+      vehicleStatus: item.vehicle.status,
+      branchName: item.vehicle.currentBranch?.name || 'PHNOM PENH',
+    }));
   }
 }

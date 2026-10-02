@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { LayoutGrid, Download, RotateCcw } from "lucide-react";
+import { LayoutGrid, Download, RotateCcw, Car } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { VehicleSummary } from "@csm/contracts";
 import { vehicleService } from "@/lib/api";
@@ -67,7 +67,7 @@ export default function InventoryPage() {
 
   const formatMoney = (val?: number | null) => {
     const num = Number(val || 0);
-    return "$" + num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return "$" + num.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   };
 
   // Export CSV handler
@@ -144,9 +144,9 @@ export default function InventoryPage() {
 
       {/* 3. Filter Inputs & Export out Button (Exact Screenshot) */}
       <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
-        <div className="flex flex-wrap items-end gap-5">
+        <div className="flex flex-wrap items-end gap-3 sm:gap-5 w-full sm:w-auto">
           {/* Model */}
-          <div className="w-56">
+          <div className="w-full sm:w-56">
             <label className="text-[12px] font-semibold text-[#0066cc] mb-1.5 block">
               Model
             </label>
@@ -160,7 +160,7 @@ export default function InventoryPage() {
           </div>
 
           {/* Vin number (placeholder: Engine) */}
-          <div className="w-56">
+          <div className="w-full sm:w-56">
             <label className="text-[12px] font-semibold text-[#0066cc] mb-1.5 block">
               Vin number
             </label>
@@ -174,7 +174,7 @@ export default function InventoryPage() {
           </div>
 
           {/* Year */}
-          <div className="w-56">
+          <div className="w-full sm:w-56">
             <label className="text-[12px] font-semibold text-[#0066cc] mb-1.5 block">
               Year
             </label>
@@ -239,6 +239,7 @@ export default function InventoryPage() {
             <thead>
               <tr className="border-b border-[#dee2e6] text-[#212529] font-bold bg-[#f8f9fa]">
                 <th className="py-2.5 px-3">#No</th>
+                <th className="py-2.5 px-3">Photo</th>
                 <th className="py-2.5 px-3">Brand</th>
                 <th className="py-2.5 px-3">Model</th>
                 <th className="py-2.5 px-3">Vin Number</th>
@@ -264,6 +265,19 @@ export default function InventoryPage() {
                 >
                   <td className="py-3 px-3 text-[#6c757d] font-bold">
                     {(currentPage - 1) * pageSize + index + 1}
+                  </td>
+                  <td className="py-2 px-3">
+                    <div className="h-10 w-14 rounded overflow-hidden bg-slate-100 flex items-center justify-center border border-slate-200 shrink-0">
+                      {v.coverImageUrl ? (
+                        <img
+                          src={v.coverImageUrl}
+                          alt={v.model}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <Car className="h-5 w-5 text-slate-400" />
+                      )}
+                    </div>
                   </td>
                   <td className="py-3 px-3 font-semibold text-[#212529] uppercase">{v.brand}</td>
                   <td className="py-3 px-3 font-medium text-[#212529] uppercase">{v.model}</td>

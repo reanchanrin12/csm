@@ -314,8 +314,8 @@ export default function ScheduleCalculatorPage() {
             </div>
 
             {/* Modal Body: Table matching live screenshot */}
-            <div className="p-4 max-h-[60vh] overflow-y-auto">
-              <table className="w-full text-left text-xs border-collapse">
+            <div className="p-4 max-h-[60vh] overflow-y-auto overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse min-w-[500px] whitespace-nowrap">
                 <thead>
                   <tr className="border-b border-slate-200 text-slate-600 font-semibold">
                     <th className="py-2 px-3 text-center w-14">Time</th>

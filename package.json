@@ -8,7 +8,8 @@
     "frontend"
   ],
   "scripts": {
-    "dev": "npm run dev:frontend",
+    "dev": "node scripts/dev.js",
+    "dev:all": "node scripts/dev.js",
     "build:contracts": "npm run build --workspace=@csm/contracts",
     "dev:backend": "npm run start:dev --workspace=csm-api",
     "dev:frontend": "npm run dev --workspace=csm-web",

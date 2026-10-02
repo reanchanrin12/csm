@@ -14,7 +14,16 @@ import {
   AlertCircle,
   FileText,
   Car,
+  Trash2,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { salesService } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -201,6 +210,23 @@ export default function SoldCarDetailPage() {
     }
   };
 
+  // 4. Void / Cancel Sale Order (Reverts vehicle to IN_STOCK)
+  const [cancellingSale, setCancellingSale] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+
+  const handleCancelSale = async () => {
+    setCancellingSale(true);
+    setError(null);
+    try {
+      await salesService.delete(id);
+      router.push("/sales?cancelled=true");
+    } catch (err: any) {
+      setError(err.message || "Failed to cancel sale order");
+      setCancellingSale(false);
+      setShowCancelDialog(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-6 bg-white min-h-[500px] flex items-center justify-center">
@@ -280,6 +306,14 @@ export default function SoldCarDetailPage() {
             className="px-2.5 py-1 text-xs font-semibold rounded border bg-white text-slate-700 border-slate-300 hover:bg-slate-50 transition-colors flex items-center gap-1.5"
           >
             <Printer className="h-3.5 w-3.5" /> Print Invoice
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowCancelDialog(true)}
+            className="px-2.5 py-1 text-xs font-semibold rounded border border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors flex items-center gap-1.5"
+            title="Void this sale order and restore vehicle to IN_STOCK"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> មោឃភាពការលក់ (Void Sale)
           </button>
         </div>
       </div>
@@ -779,6 +813,41 @@ export default function SoldCarDetailPage() {
         </div>
       </div>
       )}
+
+      {/* Cancel/Void Confirmation Dialog */}
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent className="sm:max-w-[460px] p-5">
+          <DialogHeader>
+            <DialogTitle className="text-rose-600 flex items-center gap-2 text-base">
+              <AlertCircle className="h-5 w-5" />
+              តើអ្នកពិតជាចង់មោឃភាពការលក់នេះមែនទេ?
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-600 leading-relaxed pt-2">
+              ការលុប/មោឃភាពវិក្កយបត្រ <span className="font-bold text-slate-900">{order.receiptNo}</span> នេះ នឹងប្តូរស្ថានភាពរថយន្ត <span className="font-bold text-slate-900">{order.vehicle.brand} {order.vehicle.model} ({order.vehicle.vin})</span> ត្រឡប់មកជា <strong>IN_STOCK</strong> (ក្នុងស្តុក) វិញដោយស្វ័យប្រវត្ត ហើយលុបតារាងបង់រំលស់ទាំងអស់ដែលពាក់ព័ន្ធចេញពីប្រព័ន្ធ។
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0 pt-4">
+            <button
+              type="button"
+              onClick={() => setShowCancelDialog(false)}
+              disabled={cancellingSale}
+              className="px-3.5 py-1.5 text-xs border border-slate-300 rounded hover:bg-slate-50 text-slate-700 font-medium"
+            >
+              បោះបង់ (Cancel)
+            </button>
+            <button
+              type="button"
+              onClick={handleCancelSale}
+              disabled={cancellingSale}
+              className="px-4 py-1.5 text-xs bg-rose-600 hover:bg-rose-700 text-white rounded font-medium flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>{cancellingSale ? "កំពុងដំណើរការ..." : "យល់ព្រមមោឃភាព (Confirm Void)"}</span>
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+

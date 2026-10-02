@@ -1,4 +1,6 @@
-import React from "react";
+"use client";
+
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   TableProperties,
@@ -9,74 +11,107 @@ import {
   Car,
 } from "lucide-react";
 import { vehicleService, salesService, expenseService } from "@/lib/api";
+import { getTodayDateString, getCurrentYearMonthString } from "@/lib/date-utils";
 
-export const dynamic = "force-dynamic";
-
-async function getDashboardData() {
-  try {
-    const [vehiclesData, salesData, expensesData] = await Promise.all([
-      vehicleService.list().catch(() => []),
-      salesService.list().catch(() => []),
-      expenseService.list().catch(() => ({ expenses: [], totalExpense: 0 })),
-    ]);
-
-    const sales = (salesData || []) as any[];
-    const vehicles = (vehiclesData || []) as any[];
-    const expenses = expensesData && "expenses" in expensesData ? expensesData.expenses : [];
-
-    const todayStr = new Date().toISOString().split("T")[0];
-
-    // Earned today (Sales recorded today)
-    const earnedToday = sales
-      .filter((s: any) => s.soldDate && s.soldDate.startsWith(todayStr))
-      .reduce((sum: number, s: any) => sum + Number(s.soldPrice || 0), 0);
-
-    // Expense today (Expenses recorded today)
-    const expenseToday = expenses
-      .filter((e: any) => e.expenseDate && e.expenseDate.startsWith(todayStr))
-      .reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
-
-    // Month totals
-    const currentYearMonth = new Date().toISOString().slice(0, 7);
-    const monthSales = sales.filter((s: any) => s.soldDate && s.soldDate.startsWith(currentYearMonth));
-    const payoffIncome = monthSales
-      .filter((s: any) => s.loanType === "FULL_PAYMENT")
-      .reduce((sum: number, s: any) => sum + Number(s.soldPrice || 0), 0);
-    const loanIncome = monthSales
-      .filter((s: any) => s.loanType !== "FULL_PAYMENT")
-      .reduce((sum: number, s: any) => sum + Number(s.soldPrice || 0), 0);
-
-    const monthExpenses = expenses
-      .filter((e: any) => e.expenseDate && e.expenseDate.startsWith(currentYearMonth))
-      .reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
-
-    return {
-      earnedToday,
-      expenseToday,
-      payoffIncome,
-      loanIncome,
-      monthExpenses,
-      inStockCount: vehicles.filter((v: any) => v.status === "IN_STOCK").length,
-    };
-  } catch (error) {
-    return {
-      earnedToday: 0,
-      expenseToday: 0,
-      payoffIncome: 0,
-      loanIncome: 0,
-      monthExpenses: 0,
-      inStockCount: 0,
-    };
-  }
+interface DashboardData {
+  earnedToday: number;
+  expenseToday: number;
+  payoffIncome: number;
+  loanIncome: number;
+  monthExpenses: number;
+  inStockCount: number;
+  recentVehicles: any[];
 }
 
-export default async function DashboardPage() {
-  const data = await getDashboardData();
+export default function DashboardPage() {
+  const [data, setData] = useState<DashboardData>({
+    earnedToday: 0,
+    expenseToday: 0,
+    payoffIncome: 0,
+    loanIncome: 0,
+    monthExpenses: 0,
+    inStockCount: 0,
+    recentVehicles: [],
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [vehiclesData, salesData, expensesData] = await Promise.all([
+          vehicleService.list().catch(() => []),
+          salesService.list().catch(() => []),
+          expenseService.list().catch(() => ({ expenses: [], totalExpense: 0 })),
+        ]);
+
+        const sales = (salesData || []) as any[];
+        const vehicles = (vehiclesData || []) as any[];
+        const expenses =
+          expensesData && "expenses" in expensesData ? expensesData.expenses : [];
+
+        const todayStr = getTodayDateString();
+
+        // Earned today (Sales recorded today)
+        const earnedToday = sales
+          .filter((s: any) => s.soldDate && s.soldDate.startsWith(todayStr))
+          .reduce((sum: number, s: any) => sum + Number(s.soldPrice || 0), 0);
+
+        // Expense today (Expenses recorded today)
+        const expenseToday = expenses
+          .filter((e: any) => e.expenseDate && e.expenseDate.startsWith(todayStr))
+          .reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
+
+        // Month totals
+        const currentYearMonth = getCurrentYearMonthString();
+        const monthSales = sales.filter(
+          (s: any) => s.soldDate && s.soldDate.startsWith(currentYearMonth)
+        );
+        const payoffIncome = monthSales
+          .filter((s: any) => s.loanType === "FULL_PAYMENT")
+          .reduce((sum: number, s: any) => sum + Number(s.soldPrice || 0), 0);
+        const loanIncome = monthSales
+          .filter((s: any) => s.loanType !== "FULL_PAYMENT")
+          .reduce((sum: number, s: any) => sum + Number(s.soldPrice || 0), 0);
+
+        const monthExpenses = expenses
+          .filter(
+            (e: any) => e.expenseDate && e.expenseDate.startsWith(currentYearMonth)
+          )
+          .reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
+
+        const inStockVehicles = vehicles.filter(
+          (v: any) => v.status === "IN_STOCK"
+        );
+
+        setData({
+          earnedToday,
+          expenseToday,
+          payoffIncome,
+          loanIncome,
+          monthExpenses,
+          inStockCount: inStockVehicles.length,
+          recentVehicles: inStockVehicles.slice(0, 5),
+        });
+      } catch (err) {
+        console.error("Dashboard fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadData();
+  }, []);
 
   // Max value for bar chart scaling
   const maxIncome = Math.max(data.payoffIncome, data.loanIncome, 50000);
-  const payoffHeight = Math.max(8, Math.min(100, (data.payoffIncome / maxIncome) * 100));
-  const loanHeight = Math.max(8, Math.min(100, (data.loanIncome / maxIncome) * 100));
+  const payoffHeight = Math.max(
+    8,
+    Math.min(100, (data.payoffIncome / maxIncome) * 100)
+  );
+  const loanHeight = Math.max(
+    8,
+    Math.min(100, (data.loanIncome / maxIncome) * 100)
+  );
 
   return (
     <div className="space-y-4 max-w-7xl">
@@ -100,7 +135,7 @@ export default async function DashboardPage() {
         <p className="text-[11px] text-slate-500 mt-0.5">view current data</p>
       </div>
 
-      {/* 3. Main Dashboard Grid matching reference screenshot */}
+      {/* 3. Main Dashboard Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
         {/* Left Side: 2 Charts Container (Expense for this month & Income for this month) */}
         <div className="lg:col-span-2 bg-white rounded border border-slate-200 p-6 shadow-xs">
@@ -112,7 +147,10 @@ export default async function DashboardPage() {
               </h3>
               <div className="relative w-44 h-44 flex items-center justify-center">
                 {/* Modern circular donut chart representation */}
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                <svg
+                  className="w-full h-full transform -rotate-90"
+                  viewBox="0 0 36 36"
+                >
                   <path
                     className="text-slate-100"
                     strokeWidth="3.8"
@@ -121,8 +159,11 @@ export default async function DashboardPage() {
                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                   />
                   <path
-                    className="text-[#e02424]"
-                    strokeDasharray={`${data.monthExpenses > 0 ? "75, 100" : "0, 100"}`}
+                    className="text-[#ef4444]"
+                    strokeDasharray={`${Math.min(
+                      100,
+                      (data.monthExpenses / 10000) * 100
+                    )}, 100`}
                     strokeWidth="3.8"
                     strokeLinecap="round"
                     stroke="currentColor"
@@ -130,113 +171,220 @@ export default async function DashboardPage() {
                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                   />
                 </svg>
+                {/* Center text in donut chart */}
                 <div className="absolute flex flex-col items-center justify-center text-center">
-                  <span className="text-[10px] text-slate-400 uppercase font-medium">
-                    Total
+                  <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                    TOTAL
                   </span>
-                  <span className="text-base font-bold text-slate-800">
-                    ${data.monthExpenses.toLocaleString()}
-                  </span>
+                  <div className="flex items-center text-slate-800 font-bold text-lg mt-0.5">
+                    <span className="text-sm mr-0.5">$</span>
+                    {data.monthExpenses.toLocaleString()}
+                  </div>
                 </div>
               </div>
-              <p className="text-[11px] text-slate-400 mt-4">
+              <p className="text-[11px] text-slate-400 mt-6 text-center">
                 Operational & Maintenance Costs
               </p>
             </div>
 
-            {/* Chart 2: Income for this month (Payoff vs Loan bar chart matching screenshot) */}
-            <div className="flex flex-col items-center justify-center p-4 border-t md:border-t-0 md:border-l border-slate-100">
+            {/* Chart 2: Income for this month (Bar Chart Payoff vs Loan) */}
+            <div className="flex flex-col items-center justify-between p-4 h-full border-t md:border-t-0 md:border-l border-slate-100">
               <h3 className="text-xs font-semibold text-slate-700 mb-6 text-center">
                 Income for this month
               </h3>
 
-              {/* Bar Chart Container */}
-              <div className="w-full max-w-[240px] flex flex-col">
-                {/* Chart Area with Gridlines */}
-                <div className="h-48 border-b border-l border-slate-300 relative flex items-end justify-around px-4 pb-0.5 bg-gradient-to-t from-slate-50/50 to-transparent">
-                  {/* Subtle Gridlines */}
-                  <div className="absolute inset-x-0 top-0 border-b border-slate-100 pointer-events-none" />
-                  <div className="absolute inset-x-0 top-1/4 border-b border-slate-100 pointer-events-none" />
-                  <div className="absolute inset-x-0 top-2/4 border-b border-slate-100 pointer-events-none" />
-                  <div className="absolute inset-x-0 top-3/4 border-b border-slate-100 pointer-events-none" />
-
-                  {/* Left Bar: Payoff (Brown/Amber color matching screenshot) */}
-                  <div className="flex flex-col items-center w-14 z-10">
-                    <div
-                      style={{ height: `${payoffHeight}%` }}
-                      className="w-full bg-[#b45309] hover:bg-[#92400e] rounded-t-xs transition-all shadow-xs flex items-center justify-center"
-                    />
-                  </div>
-
-                  {/* Right Bar: Loan (Yellow/Gold color matching screenshot) */}
-                  <div className="flex flex-col items-center w-14 z-10">
-                    <div
-                      style={{ height: `${loanHeight}%` }}
-                      className="w-full bg-[#eab308] hover:bg-[#ca8a04] rounded-t-xs transition-all shadow-xs flex items-center justify-center"
-                    />
-                  </div>
+              {/* Bar visualization */}
+              <div className="w-full max-w-[200px] h-48 flex items-end justify-center gap-8 pb-4 border-b border-slate-100">
+                {/* Payoff Bar */}
+                <div className="flex flex-col items-center gap-1.5 flex-1 h-full justify-end group">
+                  <span className="text-[10px] text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                    ${data.payoffIncome.toLocaleString()}
+                  </span>
+                  <div
+                    className="w-10 bg-[#b45309] rounded-t-xs transition-all duration-500 shadow-xs"
+                    style={{ height: `${payoffHeight}%` }}
+                  />
+                  <span className="text-[10px] text-slate-500 font-medium">
+                    Payoff
+                  </span>
                 </div>
 
-                {/* X-Axis Labels */}
-                <div className="flex justify-around text-[11px] text-slate-600 font-medium pt-2">
-                  <span className="w-14 text-center">Payoff</span>
-                  <span className="w-14 text-center">Loan</span>
+                {/* Loan Bar */}
+                <div className="flex flex-col items-center gap-1.5 flex-1 h-full justify-end group">
+                  <span className="text-[10px] text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                    ${data.loanIncome.toLocaleString()}
+                  </span>
+                  <div
+                    className="w-10 bg-[#eab308] rounded-t-xs transition-all duration-500 shadow-xs"
+                    style={{ height: `${loanHeight}%` }}
+                  />
+                  <span className="text-[10px] text-slate-500 font-medium">
+                    Loan
+                  </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 text-[10px] text-slate-500 mt-4">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-xs bg-[#b45309]" />
-                  Payoff: ${data.payoffIncome.toLocaleString()}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-xs bg-[#eab308]" />
-                  Loan: ${data.loanIncome.toLocaleString()}
-                </span>
+              {/* Legend & Details matching reference */}
+              <div className="mt-4 flex flex-col items-center gap-1 text-[11px] text-slate-600">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 bg-[#b45309] rounded-xs" />
+                    <span>Payoff: ${data.payoffIncome.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 bg-[#eab308] rounded-xs" />
+                    <span>Loan: ${data.loanIncome.toLocaleString()}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Side: 2 Big Colorful Status Cards (Green & Red) matching reference screenshot */}
-        <div className="space-y-5 flex flex-col justify-center">
-          {/* 1. Green Card ($ Earned today) */}
-          <div className="bg-[#10b981] hover:bg-[#059669] rounded-md p-6 text-white shadow-sm relative overflow-hidden transition-all">
-            {/* Watermark Trophy Icon in bottom right */}
-            <Trophy className="absolute right-4 bottom-2 h-28 w-28 text-black/10 stroke-1 pointer-events-none" />
-
+        {/* Right Side: 2 Stat Action Cards */}
+        <div className="flex flex-col gap-6">
+          {/* Card 1: Green Stat Card (Earned today) */}
+          <div className="bg-[#10b981] rounded text-white p-5 relative overflow-hidden flex flex-col justify-between shadow-xs min-h-[140px]">
             <div className="relative z-10">
-              <h2 className="text-3xl font-extrabold tracking-tight">
-                $ {data.earnedToday.toFixed(2)}
-              </h2>
-              <p className="text-sm font-semibold mt-1">Earned today</p>
+              <div className="flex items-center text-3xl font-extrabold tracking-tight">
+                <span className="text-xl font-normal mr-1">$</span>
+                {data.earnedToday.toLocaleString("en-US")}
+              </div>
+              <p className="text-xs font-semibold text-emerald-100 mt-1">
+                Earned today
+              </p>
+            </div>
+
+            <div className="relative z-10 pt-4 border-t border-emerald-400/40">
               <Link
-                href="/sales"
-                className="inline-block text-[11px] text-white/80 hover:text-white underline mt-2"
+                href="/reports/sales"
+                className="text-xs text-white hover:underline flex items-center gap-1"
               >
-                See details in your profile
+                View sales report &rarr;
               </Link>
             </div>
+
+            {/* Trophy outline background icon */}
+            <Trophy className="absolute -right-3 -bottom-3 w-28 h-28 text-white/15 pointer-events-none" />
           </div>
 
-          {/* 2. Red Card ($ Expense today) */}
-          <div className="bg-[#ef4444] hover:bg-[#dc2626] rounded-md p-6 text-white shadow-sm relative overflow-hidden transition-all">
-            {/* Watermark Dollar Icon in bottom right */}
-            <DollarSign className="absolute right-4 bottom-2 h-28 w-28 text-black/10 stroke-1 pointer-events-none" />
-
+          {/* Card 2: Red Stat Card (Expense today) */}
+          <div className="bg-[#ef4444] rounded text-white p-5 relative overflow-hidden flex flex-col justify-between shadow-xs min-h-[140px]">
             <div className="relative z-10">
-              <h2 className="text-3xl font-extrabold tracking-tight">
-                $ {data.expenseToday.toFixed(2)}
-              </h2>
-              <p className="text-sm font-semibold mt-1">Expense today</p>
+              <div className="flex items-center text-3xl font-extrabold tracking-tight">
+                <span className="text-xl font-normal mr-1">$</span>
+                {data.expenseToday.toLocaleString("en-US")}
+              </div>
+              <p className="text-xs font-semibold text-red-100 mt-1">
+                Expense today
+              </p>
+            </div>
+
+            <div className="relative z-10 pt-4 border-t border-red-400/40">
               <Link
-                href="/finance?tab=expenses"
-                className="inline-block text-[11px] text-white/80 hover:text-white underline mt-2"
+                href="/reports/expenses"
+                className="text-xs text-white hover:underline flex items-center gap-1"
               >
-                See details in your profile
+                View expense report &rarr;
               </Link>
             </div>
+
+            {/* Dollar outline background icon */}
+            <DollarSign className="absolute -right-3 -bottom-3 w-28 h-28 text-white/15 pointer-events-none" />
           </div>
+        </div>
+      </div>
+
+      {/* 4. In-Stock Vehicles Quick Overview Table */}
+      <div className="bg-white rounded border border-slate-200 p-5 shadow-xs">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div>
+            <h2 className="text-sm font-bold text-slate-800">
+              In-Stock Vehicles Overview
+            </h2>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Current inventory available for sale ({data.inStockCount} units in stock)
+            </p>
+          </div>
+          <Link
+            href="/inventory"
+            className="text-xs text-[#0284c7] hover:underline font-medium"
+          >
+            View all inventory &rarr;
+          </Link>
+        </div>
+
+        <div className="overflow-x-auto mt-3">
+          <table className="w-full text-left text-xs border-collapse min-w-[700px] whitespace-nowrap">
+            <thead>
+              <tr className="border-b border-slate-200 text-slate-700 font-bold bg-slate-50/50">
+                <th className="py-2.5 px-3">#No</th>
+                <th className="py-2.5 px-3">Brand & Model</th>
+                <th className="py-2.5 px-3">VIN</th>
+                <th className="py-2.5 px-3">Year</th>
+                <th className="py-2.5 px-3">Color</th>
+                <th className="py-2.5 px-3">Branch</th>
+                <th className="py-2.5 px-3">Cost / Price</th>
+                <th className="py-2.5 px-3 text-right">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-slate-600">
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="py-6 text-center text-slate-400">
+                    កំពុងផ្ទុកទិន្នន័យ (Loading inventory)...
+                  </td>
+                </tr>
+              ) : data.recentVehicles.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-6 text-center text-slate-400">
+                    No vehicles currently in stock
+                  </td>
+                </tr>
+              ) : (
+                data.recentVehicles.map((car: any, idx: number) => {
+                  const brandName =
+                    car.model?.brand?.name || car.brand?.name || car.brand || "";
+                  const modelName = car.model?.name || car.model || "";
+                  const displayName = `${brandName} ${modelName}`.trim() || "Vehicle";
+                  const year = car.madeYear || car.year || "—";
+                  const color = car.exteriorColor || car.color || "—";
+                  const branchName =
+                    car.currentBranch?.name || car.branch?.name || "PHNOM PENH";
+                  const price =
+                    Number(car.inSalePrice || car.purchaseCost || car.price || 0);
+
+                  return (
+                    <tr
+                      key={car.id || idx}
+                      className="hover:bg-slate-50/80 transition-colors"
+                    >
+                      <td className="py-2.5 px-3 font-medium text-slate-800">
+                        {idx + 1}
+                      </td>
+                      <td className="py-2.5 px-3 font-semibold text-slate-900">
+                        {displayName}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-slate-600">
+                        {car.vin || "—"}
+                      </td>
+                      <td className="py-2.5 px-3">{year}</td>
+                      <td className="py-2.5 px-3">{color}</td>
+                      <td className="py-2.5 px-3">{branchName}</td>
+                      <td className="py-2.5 px-3 font-semibold text-slate-800">
+                        ${price.toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          {car.status || "IN_STOCK"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

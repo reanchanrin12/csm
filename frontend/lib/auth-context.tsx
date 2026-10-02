@@ -23,18 +23,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function loadUser() {
-      const token = localStorage.getItem("csm_token");
-      if (!token) {
-        setLoading(false);
-        if (pathname !== "/login") {
-          router.replace("/login");
+      let token = typeof window !== "undefined" ? localStorage.getItem("csm_token") : null;
+      if (!token && typeof document !== "undefined") {
+        const match = document.cookie.match(/(?:^|;\s*)csm_token=([^;]+)/);
+        if (match && match[1]) {
+          token = decodeURIComponent(match[1]);
+          localStorage.setItem("csm_token", token);
         }
-        return;
       }
 
       try {
-        // Ensure cookie is synchronized for Next.js middleware if missing
-        if (typeof document !== "undefined" && !document.cookie.includes("csm_token=")) {
+        if (token && typeof document !== "undefined" && !document.cookie.includes("csm_token=")) {
           document.cookie = `csm_token=${encodeURIComponent(token)}; path=/; max-age=604800; SameSite=Lax`;
         }
         const currentUser = await authService.getMe();

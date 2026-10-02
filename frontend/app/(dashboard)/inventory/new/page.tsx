@@ -21,13 +21,13 @@ import {
   Plus,
   Save,
 } from "lucide-react";
-import { vehicleService, settingsService } from "@/lib/api";
+import { vehicleService, settingsService, uploadService } from "@/lib/api";
 import type { CreateVehicleDto } from "@csm/contracts";
 
 interface FormOptions {
   branches: { id: string; name: string }[];
   brands: { id: string; name: string; models: { id: string; name: string }[] }[];
-  suppliers: { id: string; nameEn: string; nameKh: string | null }[];
+  suppliers: { id: string; nameEn: string; nameKh: string | null; category?: string }[];
 }
 
 function CarPurchasingForm() {
@@ -54,33 +54,9 @@ function CarPurchasingForm() {
   const [previewUrl, setPreviewUrl] = useState<string>("");
 
   const [options, setOptions] = useState<FormOptions>({
-    branches: [
-      { id: "1", name: "BATTAMBANG" },
-      { id: "2", name: "PHNOM PENH" },
-      { id: "7", name: "BOKOR MONIVONG" },
-    ],
-    brands: [
-      { id: "149", name: "MHERO", models: [{ id: "1", name: "817" }] },
-      {
-        id: "150",
-        name: "VOYAH",
-        models: [
-          { id: "2", name: "DREAM PHEV" },
-          { id: "3", name: "FREE RWD" },
-          { id: "4", name: "TAISHAN ULTRA" },
-          { id: "5", name: "TAISHAN BLACK EDITION" },
-        ],
-      },
-    ],
-    suppliers: [
-      {
-        id: "1",
-        nameEn: "CHINA DONG FENG MOTOR INDUSTRY IMP&EXP CO., LTD CHINA DONG FENG MOTOR INDUSTRY IMP&EXP CO., LTD",
-        nameKh: "CHINA DONG FENG MOTOR INDUSTRY",
-      },
-      { id: "2", nameEn: "លោក ទៀ សុខា Mr.TEA SOKHA", nameKh: "លោក ទៀ សុខា" },
-      { id: "3", nameEn: "លោក ម៉ែន សុខ Mr.MEN SOK", nameKh: "លោក ម៉ែន សុខ" },
-    ],
+    branches: [],
+    brands: [],
+    suppliers: [],
   });
 
   // Form State
@@ -286,9 +262,9 @@ function CarPurchasingForm() {
         const data = (await vehicleService.getOptions().catch(() => null)) as any;
         if (data) {
           setOptions((prev) => ({
-            branches: Array.isArray(data.branches) && data.branches.length > 0 ? data.branches : prev.branches,
-            brands: Array.isArray(data.brands) && data.brands.length > 0 ? data.brands : prev.brands,
-            suppliers: Array.isArray(data.suppliers) && data.suppliers.length > 0 ? data.suppliers : prev.suppliers,
+            branches: Array.isArray(data.branches) ? data.branches : prev.branches,
+            brands: Array.isArray(data.brands) ? data.brands : prev.brands,
+            suppliers: Array.isArray(data.suppliers) ? data.suppliers : prev.suppliers,
           }));
         }
       } catch (err) {
@@ -356,32 +332,26 @@ function CarPurchasingForm() {
     if (!newSupplierNameEn.trim()) return;
     setIsAddingSupplier(true);
     try {
-      const res = await settingsService
-        .createSupplier({
-          nameEn: newSupplierNameEn.trim(),
-          nameKh: newSupplierNameKh.trim() || undefined,
-          phone: newSupplierPhone.trim() || undefined,
-          category: "VEHICLE",
-        })
-        .catch(() => null);
-
-      const createdSup = (res as any) || {
-        id: String(Date.now()),
+      const res = (await settingsService.createSupplier({
         nameEn: newSupplierNameEn.trim(),
-        nameKh: newSupplierNameKh.trim() || null,
-      };
+        nameKh: newSupplierNameKh.trim() || undefined,
+        phone: newSupplierPhone.trim() || undefined,
+        category: "VEHICLE",
+      })) as any;
 
-      setOptions((prev) => ({
-        ...prev,
-        suppliers: [createdSup, ...prev.suppliers],
-      }));
-      handleChange("supplierId", createdSup.id);
-      setNewSupplierNameEn("");
-      setNewSupplierNameKh("");
-      setNewSupplierPhone("");
-      setIsAddSupplierOpen(false);
+      if (res && res.id) {
+        setOptions((prev) => ({
+          ...prev,
+          suppliers: [res, ...prev.suppliers],
+        }));
+        handleChange("supplierId", res.id);
+        setNewSupplierNameEn("");
+        setNewSupplierNameKh("");
+        setNewSupplierPhone("");
+        setIsAddSupplierOpen(false);
+      }
     } catch (err: any) {
-      alert(err.message || "Failed to add supplier");
+      alert(err?.response?.data?.message || err.message || "Failed to add supplier");
     } finally {
       setIsAddingSupplier(false);
     }
@@ -438,6 +408,19 @@ function CarPurchasingForm() {
         finalImage = previewUrl;
       }
 
+      // Automatically offload heavy Base64 image to server disk storage to prevent DB bloat
+      let uploadedUrl = finalImage;
+      if (finalImage && finalImage.startsWith("data:image")) {
+        try {
+          const uploadRes = await uploadService.uploadBase64(finalImage);
+          if (uploadRes?.url) {
+            uploadedUrl = uploadRes.url;
+          }
+        } catch (uploadErr) {
+          console.warn("Server disk upload failed, falling back to embedded:", uploadErr);
+        }
+      }
+
       if (isEditMode && editId) {
         await vehicleService.update(editId, {
           vin: formData.vin,
@@ -453,8 +436,8 @@ function CarPurchasingForm() {
           registrationCard: formData.registrationCard || undefined,
           arrivalDate: formData.arrivalDate || undefined,
           purchasingDate: formData.purchasingDate || undefined,
-          coverImageUrl: finalImage || formData.coverImageUrl || undefined,
-          galleryImages: finalImage ? [finalImage] : (formData.galleryImages || []),
+          coverImageUrl: uploadedUrl || formData.coverImageUrl || undefined,
+          galleryImages: uploadedUrl ? [uploadedUrl] : (formData.galleryImages || []),
           purchaseCost: formData.purchaseCost != null ? Number(formData.purchaseCost) : undefined,
           payAmount: formData.payAmount != null ? Number(formData.payAmount) : undefined,
           inSalePrice: formData.inSalePrice != null ? Number(formData.inSalePrice) : undefined,
@@ -475,8 +458,8 @@ function CarPurchasingForm() {
       await vehicleService.create({
         ...formData,
         note: chassisNote ? `${formData.note || ""} (Chassis Note: ${chassisNote})`.trim() : formData.note,
-        coverImageUrl: finalImage || "",
-        galleryImages: finalImage ? [finalImage] : [],
+        coverImageUrl: uploadedUrl || "",
+        galleryImages: uploadedUrl ? [uploadedUrl] : [],
       });
 
       // Clear draft on successful purchase
@@ -589,26 +572,37 @@ function CarPurchasingForm() {
           <div className="space-y-4">
             {/* Supplier */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                Supplier
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Supplier <span className="text-[#718096] text-[12px] font-normal">/ អ្នកផ្គត់ផ្គង់</span>
               </label>
               <div className="flex gap-1.5">
                 <div className="relative flex-1">
                   <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-500">
                     <User className="h-4 w-4" />
                   </span>
-                  <select
-                    value={formData.supplierId}
-                    onChange={(e) => handleChange("supplierId", e.target.value)}
-                    className="h-[34px] w-full pl-9 pr-3 text-[13px] border border-[#ccc] rounded bg-white text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
-                  >
-                    <option value="">-- Select --</option>
-                    {options.suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.nameEn}
-                      </option>
-                    ))}
-                  </select>
+                    <select
+                      value={formData.supplierId}
+                      onChange={(e) => handleChange("supplierId", e.target.value)}
+                      className="h-[34px] w-full pl-9 pr-3 text-[13px] border border-[#ccc] rounded bg-white text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                    >
+                      <option value="">-- Select Supplier --</option>
+                      {options.suppliers.map((s) => {
+                        const nameText =
+                          s.nameKh && s.nameKh !== s.nameEn
+                            ? `${s.nameKh} (${s.nameEn})`
+                            : s.nameEn || s.nameKh || "";
+                        const categoryTag =
+                          s.category && s.category !== "VEHICLE"
+                            ? ` [${s.category}]`
+                            : "";
+                        return (
+                          <option key={s.id} value={s.id}>
+                            {nameText}
+                            {categoryTag}
+                          </option>
+                        );
+                      })}
+                    </select>
                 </div>
                 <button
                   type="button"
@@ -623,8 +617,8 @@ function CarPurchasingForm() {
 
             {/* Branch / Stock */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                Branch / Stock
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Branch / Stock <span className="text-[#718096] text-[12px] font-normal">/ សាខា / ឃ្លាំង</span>
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-500">
@@ -647,8 +641,8 @@ function CarPurchasingForm() {
 
             {/* Purchasing date */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                Purchasing date
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Purchasing date <span className="text-[#718096] text-[12px] font-normal">/ ថ្ងៃបញ្ជាទិញ</span>
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-500">
@@ -665,11 +659,11 @@ function CarPurchasingForm() {
 
             {/* Note */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                Note
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Note <span className="text-[#718096] text-[12px] font-normal">/ កំណត់សម្គាល់</span>
               </label>
               <textarea
-                placeholder="write some note"
+                placeholder="write some note / កត់ចំណាំបន្ថែម..."
                 value={formData.note || ""}
                 onChange={(e) => handleChange("note", e.target.value)}
                 className="w-full h-[106px] p-2.5 text-[13px] border border-[#ccc] rounded text-[#555] resize-none shadow-xs focus:outline-none focus:border-[#66afe9]"
@@ -678,8 +672,8 @@ function CarPurchasingForm() {
 
             {/* Purchase price */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                Purchase price
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Purchase price <span className="text-[#718096] text-[12px] font-normal">/ តម្លៃទិញចូល ($)</span>
               </label>
               <div className="flex">
                 <span className="inline-flex items-center px-3 text-[14px] text-[#555] bg-[#eee] border border-r-0 border-[#ccc] rounded-l font-normal">
@@ -698,8 +692,8 @@ function CarPurchasingForm() {
 
             {/* Pay amount */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                Pay amount
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Pay amount <span className="text-[#718096] text-[12px] font-normal">/ ចំនួនប្រាក់ទូទាត់ ($)</span>
               </label>
               <div className="flex">
                 <span className="inline-flex items-center px-3 text-[14px] text-[#555] bg-[#eee] border border-r-0 border-[#ccc] rounded-l font-normal">
@@ -718,8 +712,8 @@ function CarPurchasingForm() {
 
             {/* In sale price */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                In sale price
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                In sale price <span className="text-[#718096] text-[12px] font-normal">/ តម្លៃលក់ចេញ ($)</span>
               </label>
               <div className="flex">
                 <span className="inline-flex items-center px-3 text-[14px] text-[#555] bg-[#eee] border border-r-0 border-[#ccc] rounded-l font-normal">
@@ -738,8 +732,8 @@ function CarPurchasingForm() {
 
             {/* Change Image cover */}
             <div className="pt-2">
-              <label className="block text-[14px] font-semibold text-[#333] mb-1.5">
-                Change Image cover
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1.5">
+                Car Cover Image <span className="text-[#718096] text-[12px] font-normal">/ រូបភាពក្របមុខ</span>
               </label>
               {/* Outer Bootstrap 3 .thumbnail box matching media_1790330229729.png */}
               <div className="w-[190px] h-[142px] p-1 bg-white border border-[#ddd] rounded-[4px] shadow-2xs mb-2.5 relative group">
@@ -812,8 +806,8 @@ function CarPurchasingForm() {
           <div className="space-y-4">
             {/* Brand */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                Brand
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Brand <span className="text-[#718096] text-[12px] font-normal">/ ម៉ាករថយន្ត</span>
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-amber-600">
@@ -843,8 +837,8 @@ function CarPurchasingForm() {
 
             {/* Made year */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                Made year
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Made year <span className="text-[#718096] text-[12px] font-normal">/ ឆ្នាំផលិត</span>
               </label>
               <div className="flex">
                 <span className="inline-flex items-center px-3 text-[13px] text-[#777] bg-[#eee] border border-r-0 border-[#ccc] rounded-l">
@@ -852,7 +846,7 @@ function CarPurchasingForm() {
                 </span>
                 <input
                   type="text"
-                  placeholder="ex. 2014"
+                  placeholder="ex. 2024"
                   value={formData.madeYear || ""}
                   onChange={(e) => handleChange("madeYear", Number(e.target.value))}
                   className="h-[34px] flex-1 px-3 text-[13px] border border-[#ccc] rounded-r text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
@@ -862,8 +856,8 @@ function CarPurchasingForm() {
 
             {/* Chassis number */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                Chassis number
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Chassis number (VIN) <span className="text-[#718096] text-[12px] font-normal">/ លេខតួ</span>
               </label>
               <div className="flex gap-2">
                 <div className="flex flex-1">
@@ -890,8 +884,8 @@ function CarPurchasingForm() {
 
             {/* Engine / Motor number */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                Engine / Motor number
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Engine / Motor number <span className="text-[#718096] text-[12px] font-normal">/ លេខម៉ាស៊ីន</span>
               </label>
               <div className="flex">
                 <span className="inline-flex items-center px-3 text-[13px] text-[#777] bg-[#eee] border border-r-0 border-[#ccc] rounded-l">
@@ -909,8 +903,8 @@ function CarPurchasingForm() {
 
             {/* Exterior color */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                Exterior color
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Exterior color <span className="text-[#718096] text-[12px] font-normal">/ ពណ៌ខាងក្រៅ</span>
               </label>
               <div className="flex">
                 <span className="inline-flex items-center px-3 text-[13px] text-[#777] bg-[#eee] border border-r-0 border-[#ccc] rounded-l">
@@ -918,7 +912,7 @@ function CarPurchasingForm() {
                 </span>
                 <input
                   type="text"
-                  placeholder="ex. white"
+                  placeholder="ex. white / ពណ៌ស"
                   value={formData.exteriorColor}
                   onChange={(e) => handleChange("exteriorColor", e.target.value)}
                   className="h-[34px] flex-1 px-3 text-[13px] border border-[#ccc] rounded-r text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
@@ -928,8 +922,8 @@ function CarPurchasingForm() {
 
             {/* Fuel type */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                Fuel type
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Fuel type <span className="text-[#718096] text-[12px] font-normal">/ ប្រភេទទឹកប្រេង/ថាមពល</span>
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-500">
@@ -940,19 +934,19 @@ function CarPurchasingForm() {
                   onChange={(e) => handleChange("fuelType", e.target.value)}
                   className="h-[34px] w-full pl-9 pr-3 text-[13px] border border-[#ccc] rounded bg-white text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
                 >
-                  <option value="EV">EV</option>
-                  <option value="PHEV">PHEV</option>
-                  <option value="GASOLINE">GASOLINE</option>
-                  <option value="DIESEL">DIESEL</option>
-                  <option value="HYBRID">HYBRID</option>
+                  <option value="EV">EV (អគ្គិសនីសុទ្ធ)</option>
+                  <option value="PHEV">PHEV (សាំង+អគ្គិសនីដោតសាក)</option>
+                  <option value="GASOLINE">GASOLINE (សាំង)</option>
+                  <option value="DIESEL">DIESEL (ម៉ាស៊ូត)</option>
+                  <option value="HYBRID">HYBRID (កូនកាត់)</option>
                 </select>
               </div>
             </div>
 
             {/* Battery capacity */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                Battery capacity
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Battery capacity <span className="text-[#718096] text-[12px] font-normal">/ សមត្ថភាពថ្ម (kWh)</span>
               </label>
               <div className="flex">
                 <span className="inline-flex items-center px-3 text-[13px] text-[#777] bg-[#eee] border border-r-0 border-[#ccc] rounded-l">
@@ -960,7 +954,7 @@ function CarPurchasingForm() {
                 </span>
                 <input
                   type="text"
-                  placeholder="សមត្ថភាពថ្ម"
+                  placeholder="ex. 80 kWh / សមត្ថភាពថ្ម"
                   value={formData.batteryCapacity || ""}
                   onChange={(e) => handleChange("batteryCapacity", e.target.value)}
                   className="h-[34px] flex-1 px-3 text-[13px] border border-[#ccc] rounded-r text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
@@ -968,10 +962,10 @@ function CarPurchasingForm() {
               </div>
             </div>
 
-            {/* លេខប័ណ្ណ */}
+            {/* Registration Card */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                លេខប័ណ្ណ
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Registration card <span className="text-[#718096] text-[12px] font-normal">/ លេខប័ណ្ណសម្គាល់ (កាតគ្រី)</span>
               </label>
               <div className="flex">
                 <span className="inline-flex items-center px-3 text-[13px] text-[#777] bg-[#eee] border border-r-0 border-[#ccc] rounded-l">
@@ -979,7 +973,7 @@ function CarPurchasingForm() {
                 </span>
                 <input
                   type="text"
-                  placeholder="លេខប័ណ្ណ"
+                  placeholder="ex. RC-12345 / លេខកាតគ្រី"
                   value={formData.registrationCard || ""}
                   onChange={(e) => handleChange("registrationCard", e.target.value)}
                   className="h-[34px] flex-1 px-3 text-[13px] border border-[#ccc] rounded-r text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
@@ -994,8 +988,8 @@ function CarPurchasingForm() {
           <div className="space-y-4">
             {/* Model */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                Model
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Model <span className="text-[#718096] text-[12px] font-normal">/ ម៉ូដែល</span>
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-amber-600">
@@ -1034,8 +1028,8 @@ function CarPurchasingForm() {
 
             {/* Cylinders disp */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                Cylinders disp
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Cylinders disp <span className="text-[#718096] text-[12px] font-normal">/ ទំហំស៊ីឡាំង (L/cc)</span>
               </label>
               <div className="flex">
                 <span className="inline-flex items-center px-3 text-[13px] text-[#777] bg-[#eee] border border-r-0 border-[#ccc] rounded-l">
@@ -1043,7 +1037,7 @@ function CarPurchasingForm() {
                 </span>
                 <input
                   type="text"
-                  placeholder="cylinders"
+                  placeholder="ex. 2.0L / cylinders"
                   value={formData.cylinderDisp || ""}
                   onChange={(e) => handleChange("cylinderDisp", e.target.value)}
                   className="h-[34px] flex-1 px-3 text-[13px] border border-[#ccc] rounded-r text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
@@ -1053,8 +1047,8 @@ function CarPurchasingForm() {
 
             {/* Interior color */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                Interior color
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Interior color <span className="text-[#718096] text-[12px] font-normal">/ ពណ៌ខាងក្នុង</span>
               </label>
               <div className="flex">
                 <span className="inline-flex items-center px-3 text-[13px] text-[#777] bg-[#eee] border border-r-0 border-[#ccc] rounded-l">
@@ -1062,7 +1056,7 @@ function CarPurchasingForm() {
                 </span>
                 <input
                   type="text"
-                  placeholder="ex. gray"
+                  placeholder="ex. gray / ពណ៌ប្រផេះ"
                   value={formData.interiorColor || ""}
                   onChange={(e) => handleChange("interiorColor", e.target.value)}
                   className="h-[34px] flex-1 px-3 text-[13px] border border-[#ccc] rounded-r text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
@@ -1072,8 +1066,8 @@ function CarPurchasingForm() {
 
             {/* Witness */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                Witness
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Witness <span className="text-[#718096] text-[12px] font-normal">/ សាក្សី</span>
               </label>
               <div className="flex">
                 <span className="inline-flex items-center px-3 text-[13px] text-[#777] bg-[#eee] border border-r-0 border-[#ccc] rounded-l">
@@ -1081,7 +1075,7 @@ function CarPurchasingForm() {
                 </span>
                 <input
                   type="text"
-                  placeholder="witness name"
+                  placeholder="ex. witness name / ឈ្មោះសាក្សី"
                   value={formData.witness || ""}
                   onChange={(e) => handleChange("witness", e.target.value)}
                   className="h-[34px] flex-1 px-3 text-[13px] border border-[#ccc] rounded-r text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
@@ -1091,8 +1085,8 @@ function CarPurchasingForm() {
 
             {/* ផ្លាកលេខ */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                ផ្លាកលេខ
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Plate number <span className="text-[#718096] text-[12px] font-normal">/ ផ្លាកលេខ</span>
               </label>
               <div className="flex">
                 <span className="inline-flex items-center px-3 text-[13px] text-[#777] bg-[#eee] border border-r-0 border-[#ccc] rounded-l">
@@ -1100,7 +1094,7 @@ function CarPurchasingForm() {
                 </span>
                 <input
                   type="text"
-                  placeholder="ផ្លាកលេខរថយន្ត"
+                  placeholder="ex. 2BF-8888 / ផ្លាកលេខរថយន្ត"
                   value={formData.plateNumber || ""}
                   onChange={(e) => handleChange("plateNumber", e.target.value.toUpperCase())}
                   className="h-[34px] flex-1 px-3 text-[13px] border border-[#ccc] rounded-r text-[#555] uppercase shadow-xs focus:outline-none focus:border-[#66afe9]"
@@ -1110,8 +1104,8 @@ function CarPurchasingForm() {
 
             {/* ថ្ងៃមកដល់ */}
             <div>
-              <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                ថ្ងៃមកដល់
+              <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
+                Arrival date <span className="text-[#718096] text-[12px] font-normal">/ ថ្ងៃមកដល់</span>
               </label>
               <div className="flex">
                 <span className="inline-flex items-center px-3 text-[13px] text-[#777] bg-[#eee] border border-r-0 border-[#ccc] rounded-l">
@@ -1134,9 +1128,9 @@ function CarPurchasingForm() {
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-md shadow-2xl w-full max-w-[500px] border border-[#ccc] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between px-4 py-3 bg-[#f5f5f5] border-b border-[#e5e5e5]">
-              <h3 className="text-[16px] font-bold text-[#333] flex items-center gap-2">
+              <h3 className="text-[15px] font-bold text-[#333] flex items-center gap-2">
                 <UserPlus className="h-4 w-4 text-[#337ab7]" />
-                Add New Supplier
+                Add New Supplier <span className="text-[#718096] text-[13px] font-normal">/ បន្ថែមអ្នកផ្គត់ផ្គង់ថ្មី</span>
               </h3>
               <button
                 type="button"
@@ -1148,8 +1142,8 @@ function CarPurchasingForm() {
             </div>
             <form onSubmit={handleQuickAddSupplier} className="p-4 space-y-3">
               <div>
-                <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                  Supplier Name (English) *
+                <label className="block text-[13px] font-medium text-[#333] mb-1">
+                  Supplier Name (English) * <span className="text-[#718096] text-[12px]">/ ឈ្មោះអង់គ្លេស</span>
                 </label>
                 <input
                   type="text"
@@ -1161,8 +1155,8 @@ function CarPurchasingForm() {
                 />
               </div>
               <div>
-                <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                  Supplier Name (Khmer)
+                <label className="block text-[13px] font-medium text-[#333] mb-1">
+                  Supplier Name (Khmer) <span className="text-[#718096] text-[12px]">/ ឈ្មោះខ្មែរ</span>
                 </label>
                 <input
                   type="text"
@@ -1173,8 +1167,8 @@ function CarPurchasingForm() {
                 />
               </div>
               <div>
-                <label className="block text-[13px] font-semibold text-[#333] mb-1">
-                  Phone Number
+                <label className="block text-[13px] font-medium text-[#333] mb-1">
+                  Phone Number <span className="text-[#718096] text-[12px]">/ លេខទូរស័ព្ទ</span>
                 </label>
                 <input
                   type="text"

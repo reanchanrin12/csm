@@ -474,6 +474,35 @@ export class SalesService {
 
     return this.getSaleOrderById(id);
   }
+
+  // 6. Delete / Cancel Sale Order and revert Vehicle status to IN_STOCK
+  async deleteSaleOrder(id: string) {
+    const order = await this.prisma.saleOrder.findUnique({
+      where: { id },
+    });
+    if (!order) {
+      throw new NotFoundException(`Sale order ${id} not found.`);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Delete associated loan schedules
+      await tx.loanSchedule.deleteMany({
+        where: { saleOrderId: id },
+      });
+
+      // 2. Revert vehicle status back to IN_STOCK
+      await tx.vehicle.update({
+        where: { id: order.vehicleId },
+        data: { status: 'IN_STOCK' },
+      });
+
+      // 3. Delete the sale order itself
+      return tx.saleOrder.delete({
+        where: { id },
+      });
+    });
+  }
+
   async getLoanOrders() {
     const orders = await this.prisma.saleOrder.findMany({
       include: {

@@ -619,16 +619,26 @@ export default function StoreListPage() {
                 {/* Row 1: Sale price */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
                   <div>
-                    <label className="block text-[12px] font-normal text-[#333] mb-1">
-                      Sale price
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[12px] font-bold text-[#1c3d73]">
+                        តម្លៃលក់សរុប (Full Vehicle Sale Price) *
+                      </label>
+                      <span className="text-[11px] text-amber-700 font-medium bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                        មិនមែនប្រាក់បង់ប្រចាំខែទេ
+                      </span>
+                    </div>
                     <input
                       type="number"
-                      placeholder="$"
+                      placeholder="ឧ. $135,000"
                       value={salePrice}
                       onChange={(e) => setSalePrice(e.target.value === "" ? "" : Number(e.target.value))}
-                      className="w-full h-8 px-2.5 text-[12px] border border-[#ccc] rounded-xs focus:border-[#337ab7] focus:outline-none placeholder:text-[#999]"
+                      className="w-full h-8 px-2.5 text-[12px] border border-[#ccc] rounded-xs focus:border-[#337ab7] focus:outline-none placeholder:text-[#999] font-semibold"
                     />
+                    {salePrice !== "" && Number(salePrice) < selectedVehicle.totalLandedCost * 0.5 && (
+                      <p className="text-[11px] text-rose-600 font-medium mt-1">
+                        ⚠️ តម្លៃលក់ (${Number(salePrice).toLocaleString()}) ទាបជាងថ្លៃដើម (${Number(selectedVehicle.totalLandedCost).toLocaleString()}) ខ្លាំងណាស់! សូមកុំវាយប្រាក់បង់រំលស់ប្រចាំខែចូលកន្លែងនេះ។
+                      </p>
+                    )}
                   </div>
                   <div></div>
                 </div>

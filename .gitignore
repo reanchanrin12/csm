@@ -24,6 +24,14 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Uploaded files
+uploads/
+backend/uploads/
+
+# Screenshots & Media
+Screenshots/
+*.mp4
+
 # OS / Editor
 .DS_Store
 Thumbs.db

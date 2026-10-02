@@ -83,26 +83,7 @@ export class AuthService {
     }
   }
 
-  private readonly loginAttempts = new Map<
-    string,
-    { count: number; lockedUntil?: number }
-  >();
-  private readonly MAX_LOGIN_ATTEMPTS = 5;
-  private readonly LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
-
   async login(dto: LoginDto): Promise<AuthResponse> {
-    const normalizedUser = dto.username.trim().toLowerCase();
-    const attempt = this.loginAttempts.get(normalizedUser);
-    const now = Date.now();
-
-    // 1. Check if account is currently locked out
-    if (attempt && attempt.lockedUntil && attempt.lockedUntil > now) {
-      const remainingMins = Math.ceil((attempt.lockedUntil - now) / 60000);
-      throw new UnauthorizedException(
-        `គណនីត្រូវបានចាក់សោរបណ្តោះអាសន្ន។ សូមរង់ចាំ ${remainingMins} នាទីទៀត ទើបអាចសាកល្បងម្តងទៀតបាន (Account is temporarily locked. Try again in ${remainingMins} minutes).`,
-      );
-    }
-
     const user = await this.prisma.user.findUnique({
       where: { username: dto.username },
       include: {
@@ -114,28 +95,8 @@ export class AuthService {
       },
     });
 
-    const recordFailedAttempt = () => {
-      const currentCount = (attempt ? attempt.count : 0) + 1;
-      if (currentCount >= this.MAX_LOGIN_ATTEMPTS) {
-        this.loginAttempts.set(normalizedUser, {
-          count: currentCount,
-          lockedUntil: now + this.LOCKOUT_DURATION_MS,
-        });
-        throw new UnauthorizedException(
-          'អ្នកបានបញ្ចូលលេខសម្ងាត់ខុស ៥ ដងជាប់គ្នា! គណនីត្រូវបានចាក់សោរបណ្តោះអាសន្ន ១៥ នាទី (Account locked for 15 minutes due to 5 consecutive failed login attempts).',
-        );
-      } else {
-        this.loginAttempts.set(normalizedUser, { count: currentCount });
-        const remaining = this.MAX_LOGIN_ATTEMPTS - currentCount;
-        throw new UnauthorizedException(
-          `ឈ្មោះគណនី ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវឡើយ (នៅសល់ ${remaining} ដងទៀតមុនពេលគណនីត្រូវចាក់សោរ)`,
-        );
-      }
-    };
-
     if (!user) {
-      recordFailedAttempt();
-      throw new UnauthorizedException('Invalid username or password');
+      throw new UnauthorizedException('ឈ្មោះគណនី ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវឡើយ');
     }
 
     if (!user.isActive) {
@@ -146,11 +107,8 @@ export class AuthService {
 
     const isValid = this.verifyPassword(dto.password, user.passwordHash);
     if (!isValid) {
-      recordFailedAttempt();
+      throw new UnauthorizedException('ឈ្មោះគណនី ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវឡើយ');
     }
-
-    // Success: clear failed attempts
-    this.loginAttempts.delete(normalizedUser);
 
     const authUser: AuthUser = {
       id: user.id,

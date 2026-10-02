@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, Suspense } from "react";
+import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useGlobalLoadingStore } from "@/lib/loading-store";
 
@@ -107,45 +108,39 @@ export function GlobalLoader() {
 
           {/* Modal Container */}
           <div className="relative z-10 bg-[#0B1528]/95 border border-cyan-500/30 rounded-2xl p-7 shadow-2xl flex flex-col items-center text-center max-w-sm mx-4 backdrop-blur-xl">
-            {/* Dual Orbital Spinner with VOYAH Wings Logo */}
+            {/* Dual Orbital Spinner with WINWAY Logo */}
             <div className="relative w-20 h-20 mb-5 flex items-center justify-center">
               {/* Outer glowing spinning ring */}
-              <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-cyan-400 border-r-blue-500 animate-spin" />
+              <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-orange-500 border-r-blue-500 animate-spin" />
               {/* Middle reverse-spinning dashed ring */}
               <div
-                className="absolute inset-1.5 rounded-full border-2 border-transparent border-b-cyan-300 border-l-indigo-400 animate-spin"
+                className="absolute inset-1.5 rounded-full border-2 border-transparent border-b-amber-400 border-l-orange-400 animate-spin"
                 style={{ animationDirection: "reverse", animationDuration: "1.5s" }}
               />
-              {/* Inner ambient ring */}
-              <div className="absolute inset-3 rounded-full bg-gradient-to-tr from-blue-900/60 to-cyan-900/40 border border-cyan-400/20 shadow-inner" />
-
-              {/* VOYAH Wings Brand Icon in Center */}
-              <svg
-                viewBox="0 0 24 24"
-                width="28"
-                height="28"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="relative z-10 text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)] animate-pulse"
-              >
-                <path d="M4 4l8 16L20 4M8 4l4 8 4-8" />
-              </svg>
+              {/* Inner ambient circle with WINWAY Logo */}
+              <div className="relative z-10 w-12 h-12 rounded-full bg-white p-1 shadow-lg flex items-center justify-center overflow-hidden">
+                <Image
+                  src="/images/WINWAY.png"
+                  alt="WINWAY"
+                  width={40}
+                  height={40}
+                  className="h-full w-full object-contain"
+                  priority
+                />
+              </div>
             </div>
 
             {/* Brand Title */}
-            <div className="text-[11px] font-black tracking-[0.25em] text-cyan-400/90 uppercase mb-1">
-              VOYAH &amp; MHERO
+            <div className="text-[12px] font-black tracking-[0.25em] text-white uppercase mb-1">
+              WINWAY AUTO
             </div>
 
             {/* Status Message */}
             <p className="text-sm font-semibold text-white tracking-wide">
-              {message || "កំពុងដំណើរការ..."}
+              {message || "Processing..."}
             </p>
             <p className="text-[11px] text-slate-400 mt-1">
-              សូមរង់ចាំបន្តិច ប្រព័ន្ធកំពុងដំណើរការទិន្នន័យ
+              Please wait while your data is being loaded
             </p>
 
             {/* Pulsing Dots Indicator */}
@@ -162,7 +157,7 @@ export function GlobalLoader() {
                 onClick={resetLoading}
                 className="mt-5 px-3 py-1 text-[11px] text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded border border-white/10 transition-colors cursor-pointer"
               >
-                បិទផ្ទាំងនេះ (Dismiss)
+                Dismiss
               </button>
             )}
           </div>

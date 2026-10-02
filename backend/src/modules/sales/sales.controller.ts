@@ -1,12 +1,14 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { SalesService } from './sales.service';
 import {
   CreateSaleOrderSchema,
   type CreateSaleOrderDto,
 } from '@csm/contracts';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('sales')
+@UseGuards(JwtAuthGuard)
 export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
@@ -98,5 +100,10 @@ export class SalesController {
     @Body() data: { soldPrice?: number; soldDate?: string; customerId?: string },
   ) {
     return this.salesService.updateSaleOrder(id, data);
+  }
+
+  @Delete(':id')
+  deleteSaleOrder(@Param('id') id: string) {
+    return this.salesService.deleteSaleOrder(id);
   }
 }

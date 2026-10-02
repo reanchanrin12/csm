@@ -1,152 +1,183 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  LayoutGrid,
+  TableProperties,
   ArrowLeft,
-  Car,
-  FileText,
-  DollarSign,
-  Search,
   Home,
-  ShieldAlert,
+  Car,
+  DollarSign,
+  FileText,
+  Search,
+  HelpCircle,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function NotFound() {
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-[#070c18] text-white flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans select-none">
-      {/* Ambient Cockpit Lighting Background */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-blue-600/15 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-10 left-10 w-[300px] h-[300px] bg-cyan-500/10 rounded-full blur-[90px] pointer-events-none" />
-      <div className="absolute top-10 right-10 w-[300px] h-[300px] bg-indigo-600/10 rounded-full blur-[90px] pointer-events-none" />
+    <div className="min-h-screen flex flex-col bg-[#f0f2f5] font-sans antialiased text-[#212529]">
+      {/* 1. System Top Navbar matching Dashboard Header */}
+      <header className="h-[56px] w-full bg-[#070c18] border-b border-[#162138] flex items-center justify-between px-3 sm:px-5 sticky top-0 z-40 shadow-md">
+        <Link
+          href="/"
+          className="flex items-center gap-2.5 py-1 hover:opacity-90 transition-opacity"
+          title="Go to Dashboard"
+        >
+          <Image
+            src="/images/WINWAY.png"
+            alt="WINWAY"
+            width={160}
+            height={36}
+            className="h-8 sm:h-9 w-auto object-contain select-none drop-shadow-sm"
+            priority
+          />
+          <span className="font-black text-sm sm:text-base tracking-[0.18em] text-white">
+            WINWAY
+          </span>
+        </Link>
+        <span className="text-xs text-slate-400 font-medium hidden sm:inline">
+          Car Showroom Management (CSM)
+        </span>
+      </header>
 
-      {/* Grid Pattern Overlay */}
-      <div
-        className="absolute inset-0 opacity-[0.03] pointer-events-none"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle at 1px 1px, white 1px, transparent 0)",
-          backgroundSize: "28px 28px",
-        }}
-      />
+      {/* 2. Main Body Container */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 md:p-8 space-y-4">
+        {/* Breadcrumb bar */}
+        <div className="flex items-center gap-2 px-3.5 py-2 bg-[#e9ecef] border border-slate-200/70 text-xs rounded text-slate-600 w-fit">
+          <div className="bg-[#0284c7] text-white p-1 rounded-xs">
+            <TableProperties className="h-3.5 w-3.5" />
+          </div>
+          <Link href="/" className="text-[#1c64f2] hover:underline font-medium">
+            Dashboard
+          </Link>
+          <span className="text-slate-400">&gt;</span>
+          <span className="text-slate-600">Page Not Found</span>
+        </div>
 
-      <div className="relative z-10 max-w-xl w-full flex flex-col items-center text-center">
-        {/* VOYAH Wings Brand Emblem */}
-        <div className="flex items-center gap-2 mb-6">
-          <div className="h-9 w-9 rounded-lg bg-gradient-to-tr from-blue-700 to-cyan-500 p-0.5 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-            <div className="h-full w-full bg-[#070c18] rounded-[6px] flex items-center justify-center">
-              <svg
-                viewBox="0 0 24 24"
-                width="20"
-                height="20"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-cyan-400"
+        {/* Page Title & Subtitle */}
+        <div>
+          <h1 className="text-[22px] font-bold text-slate-800 tracking-tight leading-tight">
+            Page Not Found
+          </h1>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            The requested page or link is not available
+          </p>
+        </div>
+
+        {/* Content Card */}
+        <div className="bg-white rounded border border-slate-200 p-8 shadow-xs max-w-3xl text-center">
+          {/* Soft Search Badge */}
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-[#0284c7]">
+            <Search className="h-8 w-8 text-[#0284c7]" />
+          </div>
+
+          <span className="inline-flex items-center px-3 py-1 rounded text-xs font-medium bg-[#f0f3f6] text-slate-600 mb-3 border border-slate-200">
+            Status Code: 404
+          </span>
+
+          <h2 className="text-xl font-bold text-slate-800 tracking-tight">
+            We couldn&apos;t find the page you&apos;re looking for
+          </h2>
+
+          <p className="text-xs sm:text-sm text-slate-500 mt-2 leading-relaxed max-w-lg mx-auto">
+            The page may have been moved, deleted, or the URL might be mistyped. Please verify the URL or use the quick links below.
+          </p>
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+              className="h-9 px-4 text-xs font-medium border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
+              <span>Go Back</span>
+            </Button>
+
+            <Button
+              asChild
+              className="h-9 px-5 text-xs font-medium text-white bg-[#0284c7] hover:bg-[#0369a1] cursor-pointer shadow-xs"
+            >
+              <Link href="/">
+                <Home className="h-3.5 w-3.5 mr-1.5" />
+                <span>Back to Dashboard</span>
+              </Link>
+            </Button>
+          </div>
+
+          {/* Quick Links */}
+          <div className="mt-8 pt-6 border-t border-slate-100 text-left">
+            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+              Quick Navigation Links
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Link
+                href="/inventory"
+                className="flex items-center gap-3 p-3 rounded bg-slate-50 hover:bg-blue-50/60 border border-slate-200 hover:border-blue-300 transition-colors group"
               >
-                <path d="M4 4l8 16L20 4M8 4l4 8 4-8" />
-              </svg>
+                <div className="h-8 w-8 rounded bg-white border border-slate-200 flex items-center justify-center text-[#0284c7] shadow-xs">
+                  <Car className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-slate-800">Car Inventory</div>
+                  <div className="text-[11px] text-slate-500">View cars in stock</div>
+                </div>
+              </Link>
+
+              <Link
+                href="/sales"
+                className="flex items-center gap-3 p-3 rounded bg-slate-50 hover:bg-emerald-50/60 border border-slate-200 hover:border-emerald-300 transition-colors group"
+              >
+                <div className="h-8 w-8 rounded bg-white border border-slate-200 flex items-center justify-center text-emerald-600 shadow-xs">
+                  <DollarSign className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-slate-800">Sales &amp; Loans</div>
+                  <div className="text-[11px] text-slate-500">Orders, invoices and loan plans</div>
+                </div>
+              </Link>
+
+              <Link
+                href="/expenses"
+                className="flex items-center gap-3 p-3 rounded bg-slate-50 hover:bg-amber-50/60 border border-slate-200 hover:border-amber-300 transition-colors group"
+              >
+                <div className="h-8 w-8 rounded bg-white border border-slate-200 flex items-center justify-center text-amber-600 shadow-xs">
+                  <DollarSign className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-slate-800">Operating Expenses</div>
+                  <div className="text-[11px] text-slate-500">Track showroom and office expenses</div>
+                </div>
+              </Link>
+
+              <Link
+                href="/reports"
+                className="flex items-center gap-3 p-3 rounded bg-slate-50 hover:bg-indigo-50/60 border border-slate-200 hover:border-indigo-300 transition-colors group"
+              >
+                <div className="h-8 w-8 rounded bg-white border border-slate-200 flex items-center justify-center text-[#1c64f2] shadow-xs">
+                  <FileText className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-slate-800">Reports Hub</div>
+                  <div className="text-[11px] text-slate-500">Analytics and CSV export</div>
+                </div>
+              </Link>
             </div>
           </div>
-          <span className="font-black text-sm tracking-[0.25em] text-white">
-            VOYAH &amp; MHERO
-          </span>
-        </div>
 
-        {/* 404 Large Display */}
-        <div className="relative mb-2">
-          <span className="text-8xl sm:text-9xl font-black tracking-tighter bg-gradient-to-b from-white via-slate-200 to-slate-600 bg-clip-text text-transparent drop-shadow-2xl">
-            404
-          </span>
-          <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[11px] font-bold tracking-wider uppercase bg-amber-500/10 border border-amber-500/30 text-amber-400 backdrop-blur-md">
-            Page Not Found
-          </span>
-        </div>
-
-        {/* Khmer & English Message */}
-        <h1 className="text-xl sm:text-2xl font-bold text-white mt-4 tracking-tight">
-          រកមិនឃើញទំព័រដែលអ្នកកំពុងស្វែងរកទេ
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-400 mt-2 max-w-md leading-relaxed">
-          ទំព័រនេះប្រហែលជាត្រូវបានផ្លាស់ប្តូរទីតាំង លុបចេញ ឬតំណភ្ជាប់មិនត្រឹមត្រូវ។ សូមពិនិត្យមើល URL ឡើងវិញ ឬត្រឡប់ទៅផ្ទាំងគ្រប់គ្រង។
-        </p>
-
-        {/* Primary Action Buttons */}
-        <div className="flex flex-wrap items-center justify-center gap-3 mt-7 w-full">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-semibold text-slate-200 bg-white/5 hover:bg-white/10 border border-white/10 transition-all hover:scale-[1.02] cursor-pointer"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>ថយក្រោយ (Go Back)</span>
-          </button>
-
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 shadow-lg shadow-blue-600/30 transition-all hover:scale-[1.02]"
-          >
-            <Home className="h-4 w-4" />
-            <span>ទំព័រដើម (Dashboard)</span>
-          </Link>
-        </div>
-
-        {/* Quick Portal Jump Cards */}
-        <div className="w-full mt-10 pt-6 border-t border-white/10">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-3">
-            ផ្លូវកាត់សំខាន់ៗ (Quick Links)
-          </span>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-left">
-            <Link
-              href="/inventory"
-              className="p-3 rounded-lg bg-[#0e172a]/80 hover:bg-[#152342] border border-white/5 hover:border-cyan-500/30 transition-all group"
-            >
-              <Car className="h-4 w-4 text-cyan-400 mb-1.5 group-hover:scale-110 transition-transform" />
-              <div className="text-xs font-semibold text-white">Inventory</div>
-              <div className="text-[10px] text-slate-400">ឃ្លាំងរថយន្ត</div>
-            </Link>
-
-            <Link
-              href="/sales"
-              className="p-3 rounded-lg bg-[#0e172a]/80 hover:bg-[#152342] border border-white/5 hover:border-blue-500/30 transition-all group"
-            >
-              <DollarSign className="h-4 w-4 text-blue-400 mb-1.5 group-hover:scale-110 transition-transform" />
-              <div className="text-xs font-semibold text-white">Sales &amp; Loans</div>
-              <div className="text-[10px] text-slate-400">ការលក់ &amp; កម្ចី</div>
-            </Link>
-
-            <Link
-              href="/finance"
-              className="p-3 rounded-lg bg-[#0e172a]/80 hover:bg-[#152342] border border-white/5 hover:border-amber-500/30 transition-all group"
-            >
-              <DollarSign className="h-4 w-4 text-amber-400 mb-1.5 group-hover:scale-110 transition-transform" />
-              <div className="text-xs font-semibold text-white">Finance</div>
-              <div className="text-[10px] text-slate-400">ហិរញ្ញវត្ថុ</div>
-            </Link>
-
-            <Link
-              href="/reports"
-              className="p-3 rounded-lg bg-[#0e172a]/80 hover:bg-[#152342] border border-white/5 hover:border-emerald-500/30 transition-all group"
-            >
-              <FileText className="h-4 w-4 text-emerald-400 mb-1.5 group-hover:scale-110 transition-transform" />
-              <div className="text-xs font-semibold text-white">Reports</div>
-              <div className="text-[10px] text-slate-400">របាយការណ៍</div>
-            </Link>
+          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-center gap-1.5 text-xs text-slate-500">
+            <HelpCircle className="h-3.5 w-3.5 text-slate-400" />
+            <span>If you need assistance, please contact your system administrator.</span>
           </div>
         </div>
-
-        {/* Footer Support Tag */}
-        <div className="mt-8 text-[11px] text-slate-500">
-          CSM System &copy; {new Date().getFullYear()} VOYAH &amp; MHERO CAMBODIA. All rights reserved.
-        </div>
-      </div>
+      </main>
     </div>
   );
 }

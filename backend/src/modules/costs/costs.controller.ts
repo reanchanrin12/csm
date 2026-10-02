@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Patch, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { CostsService, CreateBillDto } from './costs.service';
 import type { CostCategory } from '@csm/contracts';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('costs')
+@UseGuards(JwtAuthGuard)
 export class CostsController {
   constructor(private readonly costsService: CostsService) {}
 
@@ -33,6 +35,11 @@ export class CostsController {
   @Get('bills')
   getBills(@Query('category') category?: CostCategory) {
     return this.costsService.getBills(category);
+  }
+
+  @Get('parts-repairs')
+  getPartsAndRepairsReport() {
+    return this.costsService.getPartsAndRepairsReport();
   }
 
   @Get('vehicle/:vin')

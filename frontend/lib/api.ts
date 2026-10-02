@@ -47,18 +47,35 @@ async function apiFetch<T>(
   path: string,
   options?: RequestInit
 ): Promise<T> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("csm_token") : null;
+  let token = typeof window !== "undefined" ? localStorage.getItem("csm_token") : null;
+  if (!token && typeof window === "undefined") {
+    try {
+      const { cookies } = await import("next/headers");
+      const cookieStore = await cookies();
+      token = cookieStore.get("csm_token")?.value || null;
+    } catch {
+      // Ignore if outside request context
+    }
+  }
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options?.headers as Record<string, string> | undefined),
   };
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    credentials: "include",
-    ...options,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      credentials: "include",
+      ...options,
+      headers,
+    });
+  } catch (networkErr: unknown) {
+    throw new Error(
+      `មិនអាចភ្ជាប់ទៅកាន់ Server បានទេ (Connection Failed)។ សូមប្រាកដថា Backend API (Port 4000) កំពុងដំណើរការ (Backend API on Port 4000 is unreachable).`
+    );
+  }
 
   if (!res.ok) {
     let body: ApiError = { message: `HTTP ${res.status}` };
@@ -236,6 +253,11 @@ export const salesService = {
       method: "PATCH",
       body: JSON.stringify(dto),
     }),
+
+  delete: (id: string) =>
+    apiFetch<unknown>(`/sales/${id}`, {
+      method: "DELETE",
+    }),
 };
 
 // ─────────────────────────────────────────────
@@ -326,6 +348,21 @@ export interface LandedCostBillRecord {
   vehicles: LandedCostBillVehicleItem[];
 }
 
+export interface PartsAndRepairsReportItem {
+  id: string;
+  costType: 'REPAIR' | 'ACCESSORY';
+  amount: number;
+  note: string;
+  createdAt: string;
+  billNumber: string;
+  billDate: string;
+  supplierName: string;
+  vehicleVin: string;
+  vehicleName: string;
+  vehicleStatus: string;
+  branchName: string;
+}
+
 export const costService = {
   addItem: (dto: unknown) =>
     apiFetch<unknown>("/costs/items", {
@@ -335,6 +372,9 @@ export const costService = {
 
   getBills: (category?: string) =>
     apiFetch<LandedCostBillRecord[]>(category ? `/costs/bills?category=${encodeURIComponent(category)}` : "/costs/bills"),
+
+  getPartsAndRepairs: () =>
+    apiFetch<PartsAndRepairsReportItem[]>("/costs/parts-repairs"),
 
   getOptions: () =>
     apiFetch<{ suppliers: unknown[]; vehicles: unknown[] }>("/costs/options"),
@@ -584,3 +624,31 @@ export const userService = {
       method: "DELETE",
     }),
 };
+
+// ─────────────────────────────────────────────
+// UPLOAD SERVICE
+// ─────────────────────────────────────────────
+export const uploadService = {
+  uploadBase64: (image: string) =>
+    apiFetch<{ url: string }>("/upload/base64", {
+      method: "POST",
+      body: JSON.stringify({ image }),
+    }),
+  uploadFile: async (file: File) => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("csm_token") : null;
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${API_BASE}/upload`, {
+      method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+    if (!res.ok) {
+      throw new Error("Failed to upload image");
+    }
+    return (await res.json()) as { url: string };
+  },
+};
+

@@ -10,6 +10,7 @@ import { TransfersModule } from './modules/transfers/transfers.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
+import { UploadModule } from './modules/upload/upload.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { UsersModule } from './modules/users/users.module';
     EmployeesModule,
     TransfersModule,
     SettingsModule,
+    UploadModule,
   ],
   controllers: [],
   providers: [],

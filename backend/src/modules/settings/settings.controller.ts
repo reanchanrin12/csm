@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  UseGuards,
 } from '@nestjs/common';
 import { SettingsService } from './settings.service';
 import {
@@ -23,8 +24,10 @@ import {
   type UpdateSupplierDto,
 } from '@csm/contracts';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('settings')
+@UseGuards(JwtAuthGuard)
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 

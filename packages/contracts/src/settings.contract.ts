@@ -4,7 +4,11 @@ export const SupplierTypeEnum = z.enum([
   'VEHICLE',
   'LOGISTICS',
   'REPAIR',
+  'SPARE_PARTS',
+  'ACCESSORIES',
   'CUSTOMS',
+  'INSURANCE',
+  'OTHER',
 ]);
 export type SupplierType = z.infer<typeof SupplierTypeEnum>;
 
@@ -38,6 +42,7 @@ export const CreateSupplierSchema = z.object({
   nameEn: z.string().min(1, 'Supplier name (EN) is required'),
   nameKh: z.string().optional(),
   category: SupplierTypeEnum.default('VEHICLE'),
+  job: z.string().optional(),
   country: z.string().optional(),
   phone: z.string().optional(),
   phone2: z.string().optional(),

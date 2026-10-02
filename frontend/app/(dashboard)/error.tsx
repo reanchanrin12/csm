@@ -2,7 +2,17 @@
 
 import React, { useEffect } from "react";
 import Link from "next/link";
-import { AlertTriangle, RotateCcw, Home, RefreshCw, ShieldAlert } from "lucide-react";
+import {
+  TableProperties,
+  AlertCircle,
+  RotateCcw,
+  RefreshCw,
+  Home,
+  CheckCircle2,
+  ChevronDown,
+  HelpCircle,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function DashboardError({
   error,
@@ -12,72 +22,115 @@ export default function DashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log safe error telemetry server/client-side
-    console.error("Dashboard Server Error caught:", error);
+    console.error("Dashboard error caught:", error);
   }, [error]);
 
   return (
-    <div className="min-h-[500px] flex items-center justify-center p-6">
-      <div className="relative z-10 max-w-lg w-full bg-[#0B1528] border border-red-500/30 rounded-2xl p-8 shadow-2xl text-center text-white backdrop-blur-xl">
-        {/* Ambient Hazard Glow */}
-        <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-48 h-48 bg-red-600/15 rounded-full blur-3xl pointer-events-none" />
+    <div className="space-y-4 max-w-7xl font-sans antialiased text-[#212529]">
+      {/* 1. Breadcrumb matching CSM 1.0 */}
+      <div className="flex items-center gap-2 px-3.5 py-2 bg-[#e9ecef] border border-slate-200/70 text-xs rounded text-slate-600 w-fit">
+        <div className="bg-[#e02424] text-white p-1 rounded-xs">
+          <AlertCircle className="h-3.5 w-3.5" />
+        </div>
+        <Link href="/" className="text-[#1c64f2] hover:underline font-medium">
+          Dashboard
+        </Link>
+        <span className="text-slate-400">&gt;</span>
+        <span className="text-slate-600">System Error</span>
+      </div>
 
-        {/* Warning Icon with Pulse */}
-        <div className="relative w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-          <div className="absolute inset-0 rounded-full bg-red-500/10 border border-red-500/30 animate-ping opacity-75" />
-          <div className="relative z-10 w-14 h-14 rounded-full bg-gradient-to-tr from-red-950 to-red-900 border border-red-500/40 flex items-center justify-center text-red-400 shadow-lg shadow-red-950/50">
-            <AlertTriangle className="h-7 w-7" />
-          </div>
+      {/* 2. Page Title & Subtitle */}
+      <div>
+        <h1 className="text-[22px] font-bold text-slate-800 tracking-tight leading-tight">
+          System Error
+        </h1>
+        <p className="text-[11px] text-slate-500 mt-0.5">
+          Something went wrong while processing your request
+        </p>
+      </div>
+
+      {/* 3. Main Error Card */}
+      <div className="bg-white rounded border border-slate-200 p-8 shadow-xs max-w-3xl text-center">
+        {/* Soft Alert Icon */}
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-600">
+          <AlertCircle className="h-8 w-8 text-amber-600" />
         </div>
 
-        {/* Brand Tag */}
-        <div className="text-[11px] font-black tracking-[0.25em] text-red-400 uppercase mb-2">
-          VOYAH &amp; MHERO &bull; SERVER ERROR 500
-        </div>
+        <span className="inline-flex items-center px-3 py-1 rounded text-xs font-medium bg-amber-50 text-amber-800 mb-3 border border-amber-200/60">
+          Temporary Issue
+        </span>
 
-        {/* Header Message */}
-        <h2 className="text-xl font-bold tracking-tight text-white mb-2">
-          មានបញ្ហាបច្ចេកទេសលើម៉ាស៊ីនបម្រើ (Server Error)
+        <h2 className="text-xl font-bold text-slate-800 tracking-tight">
+          Unable to process your request at this time
         </h2>
-        <p className="text-xs text-slate-300 leading-relaxed max-w-md mx-auto">
-          ប្រព័ន្ធមិនអាចដំណើរការសំណើរបស់អ្នកនៅពេលនេះបានទេ។ ទិន្នន័យរបស់អ្នកត្រូវបានការពារដោយសុវត្ថិភាព។ សូមព្យាយាមម្តងទៀត ឬទាក់ទងផ្នែកបច្ចេកទេសប្រសិនបើបញ្ហានៅតែបន្ត។
+
+        <p className="text-xs sm:text-sm text-slate-500 mt-2 leading-relaxed max-w-lg mx-auto">
+          We encountered an unexpected issue while loading this page. <strong className="font-semibold text-slate-700">Your data remains safe and unaffected.</strong>
         </p>
 
-        {/* Error Reference Code */}
-        {error.digest && (
-          <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 rounded bg-black/40 border border-white/10 text-[11px] font-mono text-slate-400">
-            <ShieldAlert className="h-3.5 w-3.5 text-slate-400" />
-            <span>Ref Code: {error.digest}</span>
+        {/* Helpful User Guidance Box */}
+        <div className="mt-6 p-4 rounded bg-slate-50 border border-slate-200 text-left text-xs text-slate-600 space-y-2 max-w-lg mx-auto">
+          <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+            <span>Recommended Actions:</span>
           </div>
-        )}
+          <ul className="list-disc list-inside space-y-1 text-slate-600 pl-1 leading-normal">
+            <li>Click <strong>&ldquo;Try Again&rdquo;</strong> to retry the request</li>
+            <li>Check your internet or network connection</li>
+            <li>Click <strong>&ldquo;Reload Page&rdquo;</strong> or return to <strong>&ldquo;Dashboard&rdquo;</strong></li>
+          </ul>
+        </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap items-center justify-center gap-3 mt-7">
-          <button
+        <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
+          <Button
             type="button"
             onClick={() => reset()}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 shadow-lg shadow-red-600/30 transition-all hover:scale-[1.02] cursor-pointer"
+            className="h-9 px-5 text-xs font-medium text-white bg-[#0284c7] hover:bg-[#0369a1] cursor-pointer shadow-xs"
           >
-            <RotateCcw className="h-4 w-4" />
-            <span>ព្យាយាមម្តងទៀត (Try Again)</span>
-          </button>
+            <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+            <span>Try Again</span>
+          </Button>
 
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => window.location.reload()}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold text-slate-200 bg-white/10 hover:bg-white/15 border border-white/10 transition-all cursor-pointer"
+            className="h-9 px-4 text-xs font-medium border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer"
           >
-            <RefreshCw className="h-4 w-4" />
-            <span>ផ្ទុកទំព័រឡើងវិញ (Reload)</span>
-          </button>
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            <span>Reload Page</span>
+          </Button>
 
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white bg-transparent hover:bg-white/5 border border-white/10 transition-all"
+          <Button
+            asChild
+            variant="outline"
+            className="h-9 px-4 text-xs font-medium border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer"
           >
-            <Home className="h-4 w-4" />
-            <span>ទំព័រដើម (Dashboard)</span>
-          </Link>
+            <Link href="/">
+              <Home className="h-3.5 w-3.5 mr-1.5" />
+              <span>Dashboard</span>
+            </Link>
+          </Button>
+        </div>
+
+        {/* Collapsible IT Details */}
+        {error.digest && (
+          <details className="mt-6 pt-4 border-t border-slate-100 text-left max-w-lg mx-auto group">
+            <summary className="text-[11px] text-slate-400 hover:text-slate-600 cursor-pointer select-none flex items-center justify-between">
+              <span>Technical Reference for IT Support</span>
+              <ChevronDown className="h-3.5 w-3.5 text-slate-400 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="mt-2 p-2.5 rounded bg-slate-100 font-mono text-[11px] text-slate-600 break-all border border-slate-200">
+              Error Digest: {error.digest}
+            </div>
+          </details>
+        )}
+
+        {/* Footer Support Info */}
+        <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-center gap-1.5 text-xs text-slate-500">
+          <HelpCircle className="h-3.5 w-3.5 text-slate-400" />
+          <span>If this issue persists, please contact your system administrator.</span>
         </div>
       </div>
     </div>

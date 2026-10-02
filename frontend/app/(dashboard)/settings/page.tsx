@@ -9,6 +9,8 @@ import {
   Edit,
   Trash2,
   AlertCircle,
+  CheckCircle,
+  Loader2,
   X,
   Eye,
   PlusCircle,
@@ -56,6 +58,10 @@ interface SupplierItem {
   category: string;
   gender?: string | undefined;
   job?: string | undefined;
+  _count?: {
+    vehicles: number;
+    bills: number;
+  };
 }
 
 interface CustomerItem {
@@ -91,6 +97,15 @@ function SettingsContent() {
   const [suppliers, setSuppliers] = useState<SupplierItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [deleteTargetSupplier, setDeleteTargetSupplier] = useState<SupplierItem | null>(null);
+  const [isDeletingSupplier, setIsDeletingSupplier] = useState(false);
+
+  useEffect(() => {
+    if (!feedback) return;
+    const timer = setTimeout(() => setFeedback(null), 6000);
+    return () => clearTimeout(timer);
+  }, [feedback]);
 
   // Company Profile State
   const [companyProfiles, setCompanyProfiles] = useState<CompanyProfileItem[]>([]);
@@ -118,7 +133,10 @@ function SettingsContent() {
   const [editingSupplier, setEditingSupplier] = useState<SupplierItem | null>(null);
   const [supplierNameEn, setSupplierNameEn] = useState("");
   const [supplierNameKh, setSupplierNameKh] = useState("");
-  const [supplierCategory, setSupplierCategory] = useState<"VEHICLE" | "LOGISTICS" | "REPAIR" | "CUSTOMS">("VEHICLE");
+  const [supplierCategory, setSupplierCategory] = useState<
+    "VEHICLE" | "LOGISTICS" | "REPAIR" | "SPARE_PARTS" | "ACCESSORIES" | "CUSTOMS" | "INSURANCE" | "OTHER"
+  >("VEHICLE");
+  const [supplierJob, setSupplierJob] = useState("");
   const [supplierCountry, setSupplierCountry] = useState("CAMBODIA");
   const [supplierPhone, setSupplierPhone] = useState("");
   const [supplierPhone2, setSupplierPhone2] = useState("");
@@ -360,6 +378,31 @@ function SettingsContent() {
 
   return (
     <div className="space-y-4 w-full">
+      {feedback && (
+        <div
+          className={`p-3 rounded text-xs flex items-center justify-between shadow-xs border transition-all ${
+            feedback.type === "success"
+              ? "bg-emerald-50 border-emerald-300 text-emerald-800"
+              : "bg-red-50 border-red-300 text-red-800"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {feedback.type === "success" ? (
+              <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
+            )}
+            <span className="font-medium">{feedback.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFeedback(null)}
+            className="text-slate-400 hover:text-slate-600 cursor-pointer ml-3"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
       {/* ───────────────────────────────────────────────────────────
           SYSTEM USERS LIST (when tab === "users")
       ───────────────────────────────────────────────────────────── */}
@@ -936,6 +979,7 @@ function SettingsContent() {
                   setSupplierNameEn("");
                   setSupplierNameKh("");
                   setSupplierCategory("VEHICLE");
+                  setSupplierJob("");
                   setSupplierCountry("CAMBODIA");
                   setSupplierPhone("");
                   setSupplierPhone2("");
@@ -1011,18 +1055,19 @@ function SettingsContent() {
                       <th className="py-2.5 px-3 w-10">#</th>
                       <th className="py-2.5 px-3">Name</th>
                       <th className="py-2.5 px-3">Gender</th>
-                      <th className="py-2.5 px-3">Job</th>
+                      <th className="py-2.5 px-3">Specialization</th>
                       <th className="py-2.5 px-3">Phone</th>
                       <th className="py-2.5 px-3">Email</th>
                       <th className="py-2.5 px-3">Country</th>
-                      <th className="py-2.5 px-3">Type</th>
+                      <th className="py-2.5 px-3">Category</th>
+                      <th className="py-2.5 px-3 text-center">Linked Records</th>
                       <th className="py-2.5 px-3 w-24 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#e7eaec]">
                     {paginatedSuppliers.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-8 text-center text-slate-400">
+                        <td colSpan={10} className="py-8 text-center text-slate-400">
                           No suppliers found
                         </td>
                       </tr>
@@ -1034,13 +1079,80 @@ function SettingsContent() {
                           </td>
                           <td className="py-2.5 px-3 font-medium text-[#333]">{s.nameEn}</td>
                           <td className="py-2.5 px-3 text-[#333]">{s.gender || "male"}</td>
-                          <td className="py-2.5 px-3 text-[#333]">{s.job || "SUPPLIER"}</td>
+                          <td className="py-2.5 px-3 text-[#333] font-medium">
+                            {s.job ? (
+                              <span className="text-[#333]">{s.job}</span>
+                            ) : (
+                              <span className="text-slate-400 italic">General</span>
+                            )}
+                          </td>
                           <td className="py-2.5 px-3 text-[#333]">{s.phone || "N/A"}</td>
                           <td className="py-2.5 px-3 text-[#333]">{s.email || ""}</td>
                           <td className="py-2.5 px-3 uppercase text-[#333] font-normal">
-                            {s.country || "CHINA"}
+                            {s.country || "CAMBODIA"}
                           </td>
-                          <td className="py-2.5 px-3 text-[#333]">{s.category}</td>
+                          <td className="py-2.5 px-3">
+                            {s.category === "VEHICLE" && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                🚗 VEHICLE
+                              </span>
+                            )}
+                            {s.category === "SPARE_PARTS" && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                🔩 SPARE PARTS
+                              </span>
+                            )}
+                            {s.category === "ACCESSORIES" && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                                ✨ ACCESSORIES
+                              </span>
+                            )}
+                            {s.category === "REPAIR" && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                🔧 REPAIR
+                              </span>
+                            )}
+                            {s.category === "LOGISTICS" && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-cyan-50 text-cyan-700 border border-cyan-200">
+                                🚢 LOGISTICS
+                              </span>
+                            )}
+                            {s.category === "CUSTOMS" && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                📑 CUSTOMS
+                              </span>
+                            )}
+                            {s.category === "INSURANCE" && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-teal-50 text-teal-700 border border-teal-200">
+                                🛡️ INSURANCE
+                              </span>
+                            )}
+                            {s.category === "OTHER" && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                📦 OTHER
+                              </span>
+                            )}
+                            {!["VEHICLE", "SPARE_PARTS", "ACCESSORIES", "REPAIR", "LOGISTICS", "CUSTOMS", "INSURANCE", "OTHER"].includes(s.category) && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-50 text-slate-600 border border-slate-200">
+                                {s.category}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            {((s._count?.vehicles ?? 0) > 0 || (s._count?.bills ?? 0) > 0) ? (
+                              <span
+                                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200"
+                                title={`Linked: ${s._count?.vehicles ?? 0} vehicles, ${s._count?.bills ?? 0} bills`}
+                              >
+                                <span>🚗 {s._count?.vehicles ?? 0}</span>
+                                <span>🧾 {s._count?.bills ?? 0}</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] text-slate-400 bg-slate-50 border border-slate-200">
+                                0 linked
+                              </span>
+                            )}
+                          </td>
                           <td className="py-2.5 px-3 text-center">
                             <div className="flex items-center justify-center gap-1">
                               <button
@@ -1060,6 +1172,7 @@ function SettingsContent() {
                                   setSupplierCategory(
                                     (s.category as any) || "VEHICLE"
                                   );
+                                  setSupplierJob(s.job || "");
                                   setSupplierCountry(s.country || "CAMBODIA");
                                   setSupplierPhone(s.phone || "");
                                   setSupplierPhone2(s.phone2 || "");
@@ -1076,15 +1189,7 @@ function SettingsContent() {
                               </button>
                               <button
                                 type="button"
-                                onClick={async () => {
-                                  if (!confirm(`Are you sure you want to delete supplier "${s.nameEn}"?`)) return;
-                                  try {
-                                    await settingsService.deleteSupplier(s.id);
-                                    setSuppliers((prev) => prev.filter((item) => item.id !== s.id));
-                                  } catch (err: unknown) {
-                                    alert(err instanceof Error ? err.message : "Failed to delete supplier");
-                                  }
-                                }}
+                                onClick={() => setDeleteTargetSupplier(s)}
                                 className="p-1 px-1.5 border border-[#ccc] rounded bg-white text-destructive hover:bg-destructive/10 shadow-xs cursor-pointer inline-flex items-center justify-center transition-colors"
                                 title="Delete supplier"
                               >
@@ -1492,8 +1597,8 @@ function SettingsContent() {
                       )}
                     </div>
                     <div>
-                      <span className="font-semibold text-slate-500">Job/Role:</span>{" "}
-                      {viewingSupplier.job || "SUPPLIER"}
+                      <span className="font-semibold text-slate-500">Specialization:</span>{" "}
+                      {viewingSupplier.job || "General"}
                     </div>
                   </div>
                   <div>
@@ -1515,6 +1620,138 @@ function SettingsContent() {
                       Close
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Delete Supplier Confirmation / Constraint Dialog */}
+          {deleteTargetSupplier && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <div className="bg-white rounded shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
+                <div
+                  className={`px-5 py-3 text-white flex items-center justify-between ${
+                    (deleteTargetSupplier._count?.vehicles ?? 0) > 0 ||
+                    (deleteTargetSupplier._count?.bills ?? 0) > 0
+                      ? "bg-[#b45309]"
+                      : "bg-[#b91c1c]"
+                  }`}
+                >
+                  <h3 className="text-sm font-bold tracking-wide flex items-center gap-2">
+                    {(deleteTargetSupplier._count?.vehicles ?? 0) > 0 ||
+                    (deleteTargetSupplier._count?.bills ?? 0) > 0 ? (
+                      <>
+                        <AlertCircle className="h-4 w-4" />
+                        <span>មិនអាចលុបក្រុមហ៊ុនផ្គត់ផ្គង់បានទេ</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4" />
+                        <span>បញ្ជាក់ការលុបក្រុមហ៊ុនផ្គត់ផ្គង់</span>
+                      </>
+                    )}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTargetSupplier(null)}
+                    className="text-white/80 hover:text-white cursor-pointer text-lg leading-none"
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                <div className="p-5 space-y-4 text-xs text-slate-700">
+                  {(deleteTargetSupplier._count?.vehicles ?? 0) > 0 ||
+                  (deleteTargetSupplier._count?.bills ?? 0) > 0 ? (
+                    <div className="space-y-3">
+                      <p className="leading-relaxed text-[13px]">
+                        ក្រុមហ៊ុនផ្គត់ផ្គង់{" "}
+                        <strong className="text-slate-900 font-bold">
+                          &quot;{deleteTargetSupplier.nameEn}&quot;
+                        </strong>{" "}
+                        មិនអាចលុបបានទេ ដោយសារមានទិន្នន័យប្រតិបត្តិការកំពុងភ្ជាប់ជាមួយ៖
+                      </p>
+                      <div className="bg-amber-50 border border-amber-200 rounded p-3 text-amber-900 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span>🚗 ចំនួនរថយន្តភ្ជាប់ជាមួយ៖</span>
+                          <strong>{deleteTargetSupplier._count?.vehicles ?? 0} គ្រឿង</strong>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>🧾 ចំនួនវិក្កយបត្រថ្លៃដើម៖</span>
+                          <strong>{deleteTargetSupplier._count?.bills ?? 0} សន្លឹក</strong>
+                        </div>
+                      </div>
+                      <p className="text-slate-500 italic text-[11px] leading-relaxed">
+                        * ប្រព័ន្ធរក្សាទុកទិន្នន័យនេះដើម្បីកុំឱ្យបាត់បង់ប្រវត្តិថ្លៃដើមរថយន្ត (Data Integrity)។ ប្រសិនបើលោកអ្នកចង់លុប សូមប្តូររថយន្តទៅក្រុមហ៊ុនផ្គត់ផ្គង់ផ្សេងជាមុនសិន។
+                      </p>
+                      <div className="flex justify-end pt-3 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTargetSupplier(null)}
+                          className="px-4 py-1.5 text-xs font-semibold text-white bg-[#112d59] rounded hover:bg-[#112d59]/90 cursor-pointer"
+                        >
+                          យល់ព្រម (OK)
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="leading-relaxed text-[13px]">
+                        តើអ្នកពិតជាចង់លុបក្រុមហ៊ុនផ្គត់ផ្គង់{" "}
+                        <strong className="text-slate-900 font-bold">
+                          &quot;{deleteTargetSupplier.nameEn}&quot;
+                        </strong>{" "}
+                        នេះមែនទេ?
+                      </p>
+                      <p className="text-slate-500 leading-relaxed">
+                        ក្រុមហ៊ុនផ្គត់ផ្គង់នេះមិនមានរថយន្ត ឬវិក្កយបត្រភ្ជាប់ជាមួយទេ ដូច្នេះលោកអ្នកអាចលុបបានដោយសុវត្ថិភាព។ សកម្មភាពនេះមិនអាចត្រឡប់វិញបានទេ។
+                      </p>
+                      <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                        <button
+                          type="button"
+                          disabled={isDeletingSupplier}
+                          onClick={() => setDeleteTargetSupplier(null)}
+                          className="px-4 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 cursor-pointer"
+                        >
+                          បោះបង់ (Cancel)
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isDeletingSupplier}
+                          onClick={async () => {
+                            try {
+                              setIsDeletingSupplier(true);
+                              await settingsService.deleteSupplier(deleteTargetSupplier.id);
+                              setSuppliers((prev) =>
+                                prev.filter((item) => item.id !== deleteTargetSupplier.id)
+                              );
+                              setFeedback({
+                                type: "success",
+                                message: `បានលុបក្រុមហ៊ុនផ្គត់ផ្គង់ "${deleteTargetSupplier.nameEn}" ដោយជោគជ័យ`,
+                              });
+                              setDeleteTargetSupplier(null);
+                            } catch (err: unknown) {
+                              setFeedback({
+                                type: "error",
+                                message:
+                                  err instanceof Error
+                                    ? err.message
+                                    : "មិនអាចលុបក្រុមហ៊ុនផ្គត់ផ្គង់បានទេ",
+                              });
+                            } finally {
+                              setIsDeletingSupplier(false);
+                            }
+                          }}
+                          className="px-4 py-1.5 text-xs font-medium text-white bg-destructive hover:bg-destructive/90 rounded cursor-pointer inline-flex items-center gap-1.5"
+                        >
+                          {isDeletingSupplier && (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          )}
+                          <span>លុបចេញ (Delete)</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1551,6 +1788,7 @@ function SettingsContent() {
                           nameEn: supplierNameEn.trim(),
                           nameKh: supplierNameKh.trim() || undefined,
                           category: supplierCategory,
+                          job: supplierJob.trim() || undefined,
                           country: supplierCountry.trim() || undefined,
                           phone: supplierPhone.trim() || undefined,
                           phone2: supplierPhone2.trim() || undefined,
@@ -1564,6 +1802,7 @@ function SettingsContent() {
                           nameEn: supplierNameEn.trim(),
                           nameKh: supplierNameKh.trim() || undefined,
                           category: supplierCategory,
+                          job: supplierJob.trim() || undefined,
                           country: supplierCountry.trim() || undefined,
                           phone: supplierPhone.trim() || undefined,
                           phone2: supplierPhone2.trim() || undefined,
@@ -1575,10 +1814,19 @@ function SettingsContent() {
                       }
                       const refreshed = await settingsService.getSuppliers();
                       setSuppliers(refreshed as SupplierItem[]);
+                      setFeedback({
+                        type: "success",
+                        message: editingSupplier
+                          ? `បានកែប្រែក្រុមហ៊ុនផ្គត់ផ្គង់ "${supplierNameEn.trim()}" ដោយជោគជ័យ`
+                          : `បានបង្កើតក្រុមហ៊ុនផ្គត់ផ្គង់ថ្មី "${supplierNameEn.trim()}" ដោយជោគជ័យ`,
+                      });
                       setIsAddSupplierOpen(false);
                       setEditingSupplier(null);
                     } catch (err: unknown) {
-                      alert(err instanceof Error ? err.message : "Failed to save supplier");
+                      setFeedback({
+                        type: "error",
+                        message: err instanceof Error ? err.message : "មិនអាចរក្សាទុកក្រុមហ៊ុនផ្គត់ផ្គង់បានទេ",
+                      });
                     } finally {
                       setSubmitting(false);
                     }
@@ -1616,23 +1864,42 @@ function SettingsContent() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[12px] font-semibold text-[#555] mb-1">
-                        Category / Type *
+                        Category / Type * (ប្រភេទអ្នកផ្គត់ផ្គង់)
                       </label>
                       <select
                         value={supplierCategory}
                         onChange={(e) =>
                           setSupplierCategory(
-                            e.target.value as "VEHICLE" | "LOGISTICS" | "REPAIR" | "CUSTOMS"
+                            e.target.value as any
                           )
                         }
                         className="w-full h-[34px] px-3 text-[13px] border rounded border-[#ccc] bg-white text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
                       >
-                        <option value="VEHICLE">VEHICLE (រថយន្ត)</option>
-                        <option value="LOGISTICS">LOGISTICS (ដឹកជញ្ជូន/កុងតឺន័រ)</option>
-                        <option value="REPAIR">REPAIR (ជួសជុល/គ្រឿងបន្លាស់)</option>
-                        <option value="CUSTOMS">CUSTOMS (ពន្ធគយ &amp; Clearance)</option>
+                        <option value="VEHICLE">🚗 VEHICLE (រថយន្ត)</option>
+                        <option value="SPARE_PARTS">🔩 SPARE PARTS (គ្រឿងបន្លាស់)</option>
+                        <option value="ACCESSORIES">✨ ACCESSORIES (គ្រឿងតុបតែងបន្ថែម)</option>
+                        <option value="REPAIR">🔧 REPAIR (យានដ្ឋានជួសជុល)</option>
+                        <option value="LOGISTICS">🚢 LOGISTICS (ដឹកជញ្ជូន/កុងតឺន័រ)</option>
+                        <option value="CUSTOMS">📑 CUSTOMS (ពន្ធគយ &amp; Clearance)</option>
+                        <option value="INSURANCE">🛡️ INSURANCE (ក្រុមហ៊ុនធានារ៉ាប់រង)</option>
+                        <option value="OTHER">📦 OTHER (សេវាកម្ម/អ្នកផ្គត់ផ្គង់ផ្សេងៗ)</option>
                       </select>
                     </div>
+                    <div>
+                      <label className="block text-[12px] font-semibold text-[#555] mb-1">
+                        Specialization / Sub-type (ជំនាញជាក់លាក់ / ចំណាត់ថ្នាក់រង)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. គ្រឿងម៉ាស៊ីន, ជាងថ្នាំ, សំបកកង់ &amp; អាគុយ..."
+                        value={supplierJob}
+                        onChange={(e) => setSupplierJob(e.target.value)}
+                        className="w-full h-[34px] px-3 text-[13px] border rounded border-[#ccc] text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[12px] font-semibold text-[#555] mb-1">
                         Country
@@ -1645,9 +1912,6 @@ function SettingsContent() {
                         className="w-full h-[34px] px-3 text-[13px] border rounded border-[#ccc] text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
                       />
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[12px] font-semibold text-[#555] mb-1">
                         Phone 1
@@ -1660,6 +1924,9 @@ function SettingsContent() {
                         className="w-full h-[34px] px-3 text-[13px] border rounded border-[#ccc] text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
                       />
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[12px] font-semibold text-[#555] mb-1">
                         Phone 2
@@ -1672,9 +1939,6 @@ function SettingsContent() {
                         className="w-full h-[34px] px-3 text-[13px] border rounded border-[#ccc] text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
                       />
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[12px] font-semibold text-[#555] mb-1">
                         Email
@@ -1687,6 +1951,9 @@ function SettingsContent() {
                         className="w-full h-[34px] px-3 text-[13px] border rounded border-[#ccc] text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
                       />
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[12px] font-semibold text-[#555] mb-1">
                         Website
@@ -1699,19 +1966,18 @@ function SettingsContent() {
                         className="w-full h-[34px] px-3 text-[13px] border rounded border-[#ccc] text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
                       />
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[12px] font-semibold text-[#555] mb-1">
-                      Address
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Wuhan, Hubei, China or Phnom Penh, Cambodia"
-                      value={supplierAddress}
-                      onChange={(e) => setSupplierAddress(e.target.value)}
-                      className="w-full h-[34px] px-3 text-[13px] border rounded border-[#ccc] text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
-                    />
+                    <div>
+                      <label className="block text-[12px] font-semibold text-[#555] mb-1">
+                        Address
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Wuhan, Hubei, China or Phnom Penh, Cambodia"
+                        value={supplierAddress}
+                        onChange={(e) => setSupplierAddress(e.target.value)}
+                        className="w-full h-[34px] px-3 text-[13px] border rounded border-[#ccc] text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                      />
+                    </div>
                   </div>
 
                   <div>

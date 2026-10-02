@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
 import { User, Lock, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -17,7 +16,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) {
-      setError("សូមបញ្ចូលឈ្មោះគណនី និងលេខសម្ងាត់ (Please enter username and password)");
+      setError("សូមបញ្ចូលឈ្មោះគណនី និងពាក្យសម្ងាត់របស់អ្នក");
       return;
     }
 
@@ -26,105 +25,105 @@ export default function LoginPage() {
     try {
       await login({ username: username.trim(), password });
     } catch (err: unknown) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "ឈ្មោះគណនី ឬលេខសម្ងាត់មិនត្រឹមត្រូវ។ សូមព្យាយាមម្តងទៀត។"
-      );
+      const rawMessage = err instanceof Error ? err.message : "";
+      // Clean, simple error: don't reveal remaining attempt countdown or internal details
+      if (
+        rawMessage.includes("មិនត្រឹមត្រូវ") ||
+        rawMessage.toLowerCase().includes("invalid") ||
+        rawMessage.toLowerCase().includes("unauthorized")
+      ) {
+        setError("ឈ្មោះគណនី ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវឡើយ");
+      } else {
+        setError(rawMessage || "ឈ្មោះគណនី ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវឡើយ");
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div
-      className="min-h-screen w-full flex items-center justify-center relative p-4 sm:p-6 bg-cover bg-center bg-no-repeat font-sans select-none"
-      style={{
-        backgroundImage: "url('/images/mhero_interior_luxury.jpg')",
-      }}
-    >
-      {/* ── Dark Translucent Overlay across full background ── */}
-      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px] pointer-events-none" />
+    <div className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 bg-[#070b14] relative overflow-hidden font-sans select-none">
+      {/* Soft Ambient Showroom Lighting in Background */}
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-blue-600/10 rounded-full blur-[140px] pointer-events-none" />
+      <div className="absolute bottom-10 right-1/4 w-[400px] h-[300px] bg-orange-500/8 rounded-full blur-[130px] pointer-events-none" />
 
-      {/* ── Center Login Card (Split Left Form & Right Showcase) ── */}
-      <div className="relative z-10 w-full max-w-[960px] bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.6)] overflow-hidden grid grid-cols-1 md:grid-cols-12 min-h-[520px] border border-white/20">
-        
-        {/* ── LEFT PANE: White Sign In Form ── */}
-        <div className="md:col-span-5 flex flex-col bg-white">
-          {/* Top Brand Banner matching the original black bar */}
-          <div className="w-full bg-[#0a0a0a] py-3.5 px-6 flex items-center justify-center border-b border-black">
-            <div className="relative h-9 w-44 flex items-center justify-center">
-              <Image
-                src="/images/logo-mhero-voyah-white.png"
-                alt="MHERO | VOYAH"
-                width={170}
-                height={36}
-                className="h-full w-auto object-contain brightness-0 invert"
-                priority
-              />
-            </div>
+      {/* Luxury White Showroom Card */}
+      <div className="relative z-10 w-full max-w-[420px] bg-white rounded-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)] border border-slate-700/30 overflow-hidden transition-all duration-300">
+        {/* Top Dark Brand Banner */}
+        <div className="bg-[#0b101d] py-4 px-6 flex items-center justify-center gap-3 border-b border-slate-800">
+          <Image
+            src="/images/WINWAY.png"
+            alt="WINWAY"
+            width={120}
+            height={32}
+            className="h-7 w-auto object-contain select-none"
+            priority
+          />
+          <span className="text-white font-extrabold text-base tracking-[0.2em] uppercase">
+            WINWAY
+          </span>
+        </div>
+
+        {/* Card Body */}
+        <div className="p-7 sm:p-8">
+          {/* Form Title & Orange Accent Bar */}
+          <div className="text-center mb-6">
+            <h1 className="text-xl font-black tracking-[0.25em] text-[#1c2d4a] uppercase">
+              SIGN IN
+            </h1>
+            <div className="w-10 h-0.5 bg-orange-500 mx-auto mt-2 rounded-full" />
           </div>
 
-          {/* Form Body */}
-          <div className="flex-1 p-6 sm:p-8 md:p-9 flex flex-col justify-center">
-            {/* Title */}
-            <div className="text-center mb-7">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-[0.2em] text-[#1c355e] uppercase">
-                SIGN IN
-              </h1>
-              <div className="w-10 h-[2.5px] bg-[#d97706] mx-auto mt-1.5 rounded-full" />
+          {/* Sleek, Compact Modern Error Banner */}
+          {error && (
+            <div className="mb-4 px-3.5 py-2.5 rounded-xl bg-rose-50/90 border border-rose-200/70 flex items-center gap-2.5 text-rose-800 shadow-xs animate-in fade-in slide-in-from-top-1 duration-150">
+              <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />
+              <span className="text-[13px] sm:text-sm font-medium leading-normal text-rose-800 font-sans">
+                {error}
+              </span>
             </div>
+          )}
 
-            {error && (
-              <Alert variant="destructive" className="mb-4 bg-red-50/90 border-red-200 text-red-900 text-left shadow-2xs">
-                <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
-                <div>
-                  <AlertTitle className="text-xs font-bold text-red-800 tracking-wide">
-                    ការចូលប្រើប្រាស់មិនជោគជ័យ (Sign-in Failed)
-                  </AlertTitle>
-                  <AlertDescription className="text-xs text-red-700/90 mt-0.5 leading-relaxed">
-                    {error}
-                  </AlertDescription>
-                </div>
-              </Alert>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Username Input */}
-              <div className="relative">
-                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Username / Phone Field */}
+            <div className="space-y-1">
+              <div className="relative group">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#1c3d73] transition-colors pointer-events-none">
                   <User className="h-4 w-4" />
                 </div>
                 <input
                   type="text"
+                  autoFocus
+                  required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="User Name"
-                  disabled={loading}
-                  autoComplete="username"
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all shadow-2xs"
+                  placeholder="088 855 8298"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-slate-800 text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1c3d73] focus:ring-3 focus:ring-[#1c3d73]/10 focus:outline-none transition-all placeholder:text-slate-400 font-medium"
                 />
               </div>
+            </div>
 
-              {/* Password Input */}
-              <div className="relative">
-                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+            {/* Password Field */}
+            <div className="space-y-1">
+              <div className="relative group">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#1c3d73] transition-colors pointer-events-none">
                   <Lock className="h-4 w-4" />
                 </div>
                 <input
                   type={showPassword ? "text" : "password"}
+                  required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Password"
-                  disabled={loading}
-                  autoComplete="current-password"
-                  className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all shadow-2xs"
+                  className="w-full pl-10 pr-10 py-2.5 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-slate-800 text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1c3d73] focus:ring-3 focus:ring-[#1c3d73]/10 focus:outline-none transition-all placeholder:text-slate-400 font-medium tracking-wide"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer transition-colors p-0.5"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer p-1 transition-colors"
                   tabIndex={-1}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4" />
@@ -133,66 +132,51 @@ export default function LoginPage() {
                   )}
                 </button>
               </div>
+            </div>
 
-              {/* Forgot Password Link */}
-              <div className="text-right">
-                <span
-                  onClick={() =>
-                    alert("សូមទាក់ទង Administrator ដើម្បីកំណត់លេខសម្ងាត់ឡើងវិញ (Please contact system administrator)")
-                  }
-                  className="text-[11px] text-[#2563eb] hover:underline cursor-pointer"
-                >
-                  Forgot Password?
-                </span>
-              </div>
-
-              {/* Sign In Button */}
+            {/* Forgot Password Link */}
+            <div className="flex justify-end pt-0.5">
               <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2.5 px-4 bg-[#1c4484] hover:bg-[#153468] active:scale-[0.99] text-white font-semibold text-sm rounded-lg shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                type="button"
+                onClick={() =>
+                  alert("សូមទាក់ទងអ្នកគ្រប់គ្រងប្រព័ន្ធ (Admin) ដើម្បីកំណត់ពាក្យសម្ងាត់ឡើងវិញ។")
+                }
+                className="text-xs text-slate-500 hover:text-[#1c3d73] transition-colors cursor-pointer font-medium hover:underline"
               >
-                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                <span>{loading ? "Signing in..." : "Sign in"}</span>
+                Forgot Password?
               </button>
+            </div>
 
-              {/* Footer notice */}
-              <div className="pt-2 text-center text-xs text-slate-500">
-                Don&apos;t have an account yet?{" "}
-                <span
-                  onClick={() =>
-                    alert("សូមទាក់ទង Administrator ដើម្បីបង្កើតគណនីថ្មី (Contact administrator to create account)")
-                  }
-                  className="text-[#2563eb] font-medium hover:underline cursor-pointer"
-                >
-                  Create an account
-                </span>
-              </div>
-            </form>
+            {/* Solid Navy Blue Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full mt-2 py-2.5 px-5 rounded-xl font-bold text-xs sm:text-sm text-white tracking-wide bg-[#1c3d73] hover:bg-[#15325f] active:bg-[#10274c] shadow-md hover:shadow-lg transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Signing in...</span>
+                </>
+              ) : (
+                <span>Sign In</span>
+              )}
+            </button>
+          </form>
+
+          {/* Footer Notice */}
+          <div className="mt-6 text-center text-xs text-slate-500">
+            Don&apos;t have an account yet?{" "}
+            <span
+              onClick={() =>
+                alert("សូមទាក់ទងអ្នកគ្រប់គ្រងប្រព័ន្ធ (Admin) ដើម្បីបង្កើតគណនីថ្មី។")
+              }
+              className="text-[#1c3d73] hover:text-blue-900 font-semibold cursor-pointer hover:underline transition-colors"
+            >
+              Create an account
+            </span>
           </div>
         </div>
-
-        {/* ── RIGHT PANE: Luxury Automotive Interior Showcase ── */}
-        <div
-          className="md:col-span-7 relative hidden md:block bg-cover bg-center overflow-hidden"
-          style={{
-            backgroundImage: "url('/images/mhero_interior_luxury.jpg')",
-          }}
-        >
-          {/* Subtle gradient shadow over image for text readability */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-
-          {/* Bottom Left Branding on the Car Image */}
-          <div className="absolute bottom-8 left-8 z-10 text-white select-none">
-            <h2 className="text-3xl font-black tracking-wider uppercase font-sans drop-shadow-md">
-              MHERO
-            </h2>
-            <p className="text-sm font-medium tracking-wide text-slate-200 mt-1 drop-shadow-sm">
-              Engineered for the future
-            </p>
-          </div>
-        </div>
-
       </div>
     </div>
   );

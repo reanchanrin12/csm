@@ -68,7 +68,11 @@ enum SupplierType {
   VEHICLE
   LOGISTICS
   REPAIR
+  SPARE_PARTS
+  ACCESSORIES
   CUSTOMS
+  INSURANCE
+  OTHER
 }
 
 model Branch {
@@ -107,6 +111,7 @@ model Supplier {
   nameEn    String
   nameKh    String?
   country   String?
+  job       String?
   phone     String?
   phone2    String?
   email     String?
