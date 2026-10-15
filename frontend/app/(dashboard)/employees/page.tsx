@@ -11,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   LayoutGrid,
   Edit,
+  Trash2,
   AlertCircle,
   X,
 } from "lucide-react";
@@ -215,6 +216,19 @@ export default function EmployeesPage() {
     }
   };
 
+  // Delete Employee
+  const handleDeleteEmployee = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete employee "${name}"?`)) {
+      return;
+    }
+    try {
+      await employeeService.delete(id);
+      await fetchData();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to delete employee");
+    }
+  };
+
   // Open Salary Payment Modal
   const handleOpenSalaryPayment = () => {
     const firstEmp = employees[0];
@@ -401,14 +415,22 @@ export default function EmployeesPage() {
                         <td className="py-3 px-3 text-[#495057]">{emp.jobPosition || emp.role}</td>
                         <td className="py-3 px-3 text-[#212529] font-normal">${emp.salary}</td>
                         <td className="py-3 px-3 text-[#495057] uppercase">{emp.branchName}</td>
-                        <td className="py-3 px-3 text-center">
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
                           <button
                             type="button"
                             onClick={() => handleOpenEditEmployee(emp)}
-                            className="w-6 h-6 rounded bg-[#0d6efd] hover:bg-[#0b5ed7] text-white inline-flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                            className="w-6 h-6 rounded bg-[#0d6efd] hover:bg-[#0b5ed7] text-white inline-flex items-center justify-center cursor-pointer transition-colors shadow-2xs mr-1.5"
                             title="Edit Employee"
                           >
                             <Edit className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteEmployee(emp.id, emp.englishName)}
+                            className="w-6 h-6 rounded bg-[#dc3545] hover:bg-[#bb2d3b] text-white inline-flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                            title="Delete Employee"
+                          >
+                            <Trash2 className="h-3 w-3" />
                           </button>
                         </td>
                       </tr>
