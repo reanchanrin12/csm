@@ -10,6 +10,7 @@ jobs:
   deploy:
     name: Deploy to Production VPS
     runs-on: ubuntu-latest
+    if: ${{ secrets.SERVER_HOST != '' }}
 
     steps:
       - name: Trigger Remote Deployment over SSH
