@@ -136,11 +136,23 @@ export class CostsService {
     });
   }
 
-  // 2. Get bills list filtered by category
-  async getBills(category?: CostCategory) {
+  // 2. Get bills list filtered by category, VIN or billNumber
+  async getBills(category?: CostCategory, searchVin?: string, billNumber?: string) {
     const where: any = {};
     if (category) {
       where.category = category;
+    }
+    if (billNumber && billNumber.trim()) {
+      where.billNumber = { contains: billNumber.trim(), mode: 'insensitive' };
+    }
+    if (searchVin && searchVin.trim()) {
+      where.costItems = {
+        some: {
+          vehicle: {
+            vin: { contains: searchVin.trim(), mode: 'insensitive' },
+          },
+        },
+      };
     }
 
     const bills = await this.prisma.landedCostBill.findMany({
@@ -209,6 +221,22 @@ export class CostsService {
       where: { id },
       data,
     });
+  }
+
+  async deleteBill(id: string) {
+    const bill = await this.prisma.landedCostBill.findUnique({
+      where: { id },
+      include: { costItems: true },
+    });
+    if (!bill) throw new NotFoundException('Bill not found');
+    await this.prisma.vehicleCostItem.deleteMany({ where: { billId: id } });
+    return this.prisma.landedCostBill.delete({ where: { id } });
+  }
+
+  async deleteCostItem(id: string) {
+    const item = await this.prisma.vehicleCostItem.findUnique({ where: { id } });
+    if (!item) throw new NotFoundException('Cost item not found');
+    return this.prisma.vehicleCostItem.delete({ where: { id } });
   }
 
   // 3. Get landed cost breakdown for a specific vehicle by VIN

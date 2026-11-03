@@ -370,8 +370,14 @@ export const costService = {
       body: JSON.stringify(dto),
     }),
 
-  getBills: (category?: string) =>
-    apiFetch<LandedCostBillRecord[]>(category ? `/costs/bills?category=${encodeURIComponent(category)}` : "/costs/bills"),
+  getBills: (category?: string, vin?: string, billNumber?: string) => {
+    const params = new URLSearchParams();
+    if (category) params.set("category", category);
+    if (vin) params.set("vin", vin);
+    if (billNumber) params.set("billNumber", billNumber);
+    const qs = params.toString();
+    return apiFetch<LandedCostBillRecord[]>(qs ? `/costs/bills?${qs}` : "/costs/bills");
+  },
 
   getPartsAndRepairs: () =>
     apiFetch<PartsAndRepairsReportItem[]>("/costs/parts-repairs"),
@@ -392,6 +398,16 @@ export const costService = {
     apiFetch<unknown>(`/costs/bills/${id}`, {
       method: "PATCH",
       body: JSON.stringify(dto),
+    }),
+
+  deleteBill: (id: string) =>
+    apiFetch<void>(`/costs/bills/${id}`, {
+      method: "DELETE",
+    }),
+
+  deleteCostItem: (id: string) =>
+    apiFetch<void>(`/costs/items/${id}`, {
+      method: "DELETE",
     }),
 
   getSupplierPayments: () =>
@@ -474,6 +490,13 @@ export const settingsService = {
       method: "POST",
       body: JSON.stringify(dto),
     }),
+  updateBrand: (id: string, dto: { name: string }) =>
+    apiFetch<unknown>(`/settings/brands/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(dto),
+    }),
+  deleteBrand: (id: string) =>
+    apiFetch<void>(`/settings/brands/${id}`, { method: "DELETE" }),
   createModel: (dto: CreateModelDto) =>
     apiFetch<unknown>("/settings/models", {
       method: "POST",

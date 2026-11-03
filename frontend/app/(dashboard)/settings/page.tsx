@@ -148,6 +148,8 @@ function SettingsContent() {
   // Modal Dialogs
   const [isAddBrandOpen, setIsAddBrandOpen] = useState(false);
   const [newBrandName, setNewBrandName] = useState("");
+  const [editingBrand, setEditingBrand] = useState<{ id: string; name: string } | null>(null);
+  const [editBrandName, setEditBrandName] = useState("");
 
   const [isAddBranchOpen, setIsAddBranchOpen] = useState(false);
   const [branchName, setBranchName] = useState("");
@@ -266,6 +268,34 @@ function SettingsContent() {
       alert(err instanceof Error ? err.message : "Failed to create brand");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Handle Edit Brand
+  const handleUpdateBrand = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBrand || !editBrandName.trim()) return;
+    setSubmitting(true);
+    try {
+      await settingsService.updateBrand(editingBrand.id, { name: editBrandName.trim().toUpperCase() });
+      setEditingBrand(null);
+      setEditBrandName("");
+      await fetchAll();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to update brand");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle Delete Brand
+  const handleDeleteBrand = async (brand: BrandItem) => {
+    if (!confirm(`Are you sure you want to delete brand "${brand.name}"?`)) return;
+    try {
+      await settingsService.deleteBrand(brand.id);
+      await fetchAll();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to delete brand");
     }
   };
 
@@ -463,7 +493,7 @@ function SettingsContent() {
 
           {/* Subtitle */}
           <p className="text-[12px] text-slate-500 mt-2">
-            costomize and view brand list
+            Customize and view brand list
           </p>
 
           {/* Table */}
@@ -488,38 +518,35 @@ function SettingsContent() {
                         <td className="py-2.5 px-4 font-medium uppercase text-slate-800">
                           {brand.name}
                         </td>
-                        <td className="py-2.5 px-4">
+                        <td className="py-2.5 px-4 flex items-center gap-1.5">
                           <button
                             type="button"
+                            onClick={() => {
+                              setEditingBrand(brand);
+                              setEditBrandName(brand.name);
+                            }}
                             className="bg-[#0284c7] hover:bg-[#0369a1] text-white p-1 rounded-xs cursor-pointer transition-colors"
                             title="Edit"
                           >
                             <Edit className="h-3 w-3" />
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteBrand(brand)}
+                            className="bg-[#dc2626] hover:bg-[#b91c1c] text-white p-1 rounded-xs cursor-pointer transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
                         </td>
                       </tr>
                     ))
                 ) : (
-                  <>
-                    <tr className="hover:bg-slate-50/70">
-                      <td className="py-2.5 px-4 font-semibold text-slate-800">1</td>
-                      <td className="py-2.5 px-4 font-medium uppercase text-slate-800">MHERO</td>
-                      <td className="py-2.5 px-4">
-                        <button type="button" className="bg-[#0284c7] text-white p-1 rounded-xs">
-                          <Edit className="h-3 w-3" />
-                        </button>
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-slate-50/70">
-                      <td className="py-2.5 px-4 font-semibold text-slate-800">2</td>
-                      <td className="py-2.5 px-4 font-medium uppercase text-slate-800">VOYAH</td>
-                      <td className="py-2.5 px-4">
-                        <button type="button" className="bg-[#0284c7] text-white p-1 rounded-xs">
-                          <Edit className="h-3 w-3" />
-                        </button>
-                      </td>
-                    </tr>
-                  </>
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-slate-400">
+                      {loading ? "កំពុងទាញយកទិន្នន័យ (Loading brands)..." : "មិនទាន់មានទិន្នន័យម៉ាករថយន្តនៅឡើយទេ (No car brands found)"}
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
@@ -2220,6 +2247,57 @@ function SettingsContent() {
                 <button
                   type="button"
                   onClick={() => setIsAddBrandOpen(false)}
+                  className="px-4 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded"
+                >
+                  Close
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ───────────────────────────────────────────────────────────
+          MODAL: EDIT CAR BRAND
+      ───────────────────────────────────────────────────────────── */}
+      {editingBrand && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-md shadow-xl w-full max-w-md overflow-hidden border border-slate-300">
+            <div className="bg-[#112d59] text-white px-4 py-2.5 flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Edit car brand</h3>
+              <button
+                type="button"
+                onClick={() => setEditingBrand(null)}
+                className="text-white/80 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <form onSubmit={handleUpdateBrand} className="p-4 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Brand name *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. VOYAH, MHERO"
+                  value={editBrandName}
+                  onChange={(e) => setEditBrandName(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs border rounded border-slate-300 focus:outline-none focus:border-[#1c64f2]"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-1.5 text-xs font-semibold text-white bg-[#1c64f2] hover:bg-[#1a56db] rounded"
+                >
+                  {submitting ? "Updating..." : "Update"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingBrand(null)}
                   className="px-4 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded"
                 >
                   Close

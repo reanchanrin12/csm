@@ -12,6 +12,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   LayoutGrid,
+  Plus,
   PlusCircle,
   Search,
   Eye,
@@ -26,6 +27,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Barcode,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { costService, settingsService } from "@/lib/api";
@@ -92,18 +94,38 @@ interface AddedCarItem {
   total: number;
 }
 
+const STANDARD_COUNTRIES = [
+  "BELGUIM",
+  "CAMBODIA",
+  "CANADA",
+  "CHINA",
+  "DENMARK",
+  "DUBAI",
+  "GERMANY",
+  "HONG KONG",
+  "JAPAN",
+  "LAO PDR",
+  "MALAYSIA",
+  "RUSSIA",
+  "TAIWAN",
+  "THAILAND",
+  "USA",
+];
+
 function LogisticsContent() {
   const searchParams = useSearchParams();
   const urlTab = searchParams.get("tab");
 
+  const isShippingMode = urlTab === "shipping";
+
   // View state: "dashboard" shows the tabs (Bill list / Logistic company),
   // "add-clearance" shows the full "Adding new tax & clearance fee" page (Screenshot 3).
   const [viewMode, setViewMode] = useState<"dashboard" | "add-clearance">(
-    urlTab === "clearance" || urlTab === "new" ? "add-clearance" : "dashboard"
+    urlTab === "clearance" || urlTab === "new" || urlTab === "shipping" ? "add-clearance" : "dashboard"
   );
 
   useEffect(() => {
-    if (urlTab === "clearance" || urlTab === "new") {
+    if (urlTab === "clearance" || urlTab === "new" || urlTab === "shipping") {
       setViewMode("add-clearance");
     } else {
       setViewMode("dashboard");
@@ -165,7 +187,8 @@ function LogisticsContent() {
   const [companyNameKh, setCompanyNameKh] = useState("");
   const [companyEmail, setCompanyEmail] = useState("");
   const [companyWebsite, setCompanyWebsite] = useState("");
-  const [companyCountry, setCompanyCountry] = useState("Cambodia");
+  const [companyCountry, setCompanyCountry] = useState("");
+  const [countryList, setCountryList] = useState<string[]>(STANDARD_COUNTRIES);
   const [companyPhone1, setCompanyPhone1] = useState("");
   const [companyPhone2, setCompanyPhone2] = useState("");
   const [companyAddress, setCompanyAddress] = useState("");
@@ -173,14 +196,11 @@ function LogisticsContent() {
   const [companySubmitting, setCompanySubmitting] = useState(false);
   const [companyError, setCompanyError] = useState<string | null>(null);
 
-  // Generate a realistic invoice number on mount/reset
+  // Generate invoice number matching reference: e.g. IN202611037873 (IN + YYYYMMDD + 4 digits)
   const generateInvoiceNumber = () => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
-    const rand = Math.floor(1000 + Math.random() * 9000);
-    return `IN${year}${month}${day}${rand.toString().slice(0, 4)}`;
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const rand4 = Math.floor(1000 + Math.random() * 9000);
+    return `IN${today}${rand4}`;
   };
 
   useEffect(() => {
@@ -193,14 +213,21 @@ function LogisticsContent() {
     setLoading(true);
     setError(null);
     try {
-      const [billsData, optionsData] = await Promise.all([
+      const [billsData, optionsData, countriesData] = await Promise.all([
         costService.getBills(),
         costService.getOptions(),
+        settingsService.getCountries().catch(() => []),
       ]);
       setBills((billsData as BillItem[]) ?? []);
       const opts = optionsData as { suppliers: SupplierOption[]; vehicles: VehicleOption[] };
       setSuppliers(opts.suppliers ?? []);
       setVehicles(opts.vehicles ?? []);
+
+      if (Array.isArray(countriesData) && countriesData.length > 0) {
+        const names = countriesData.map((c: { name: string }) => c.name.toUpperCase().trim()).filter(Boolean);
+        const merged = Array.from(new Set([...STANDARD_COUNTRIES, ...names])).sort();
+        setCountryList(merged);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
@@ -383,14 +410,24 @@ function LogisticsContent() {
       total: totalRow,
     };
 
-    setAddedCars((prev) => [...prev, newItem]);
+    setAddedCars((prev) => {
+      const next = [...prev, newItem];
+      const newTotal = next.reduce((s, c) => s + c.total, 0);
+      setPaidAmount(newTotal);
+      return next;
+    });
     setSelectedCarVin("");
     setInputClearanceFee("");
     setInputTaxPayment("");
   };
 
   const handleRemoveCarFromList = (vinToRemove: string) => {
-    setAddedCars((prev) => prev.filter((c) => c.vin !== vinToRemove));
+    setAddedCars((prev) => {
+      const next = prev.filter((c) => c.vin !== vinToRemove);
+      const newTotal = next.reduce((s, c) => s + c.total, 0);
+      setPaidAmount(newTotal);
+      return next;
+    });
   };
 
   // Compute grand total and balance
@@ -507,7 +544,7 @@ function LogisticsContent() {
     setCompanyNameKh("");
     setCompanyEmail("");
     setCompanyWebsite("");
-    setCompanyCountry("Cambodia");
+    setCompanyCountry("");
     setCompanyPhone1("");
     setCompanyPhone2("");
     setCompanyAddress("");
@@ -522,7 +559,7 @@ function LogisticsContent() {
     setCompanyNameKh(s.nameKh || "");
     setCompanyEmail(s.email || "");
     setCompanyWebsite(s.website || "");
-    setCompanyCountry(s.country || "Cambodia");
+    setCompanyCountry(s.country || "");
     setCompanyPhone1(s.phone || "");
     setCompanyPhone2(s.phone2 || "");
     setCompanyAddress(s.address || "");
@@ -555,7 +592,7 @@ function LogisticsContent() {
         });
         setActionSuccess(`Company "${companyNameEn.trim()}" updated successfully.`);
       } else {
-        await settingsService.createSupplier({
+        const created = await settingsService.createSupplier({
           nameEn: companyNameEn.trim(),
           nameKh: companyNameKh.trim() || undefined,
           country: companyCountry.trim() || undefined,
@@ -567,6 +604,9 @@ function LogisticsContent() {
           note: companyNote.trim() || undefined,
           category: "LOGISTICS",
         });
+        if (created && (created as { id?: string }).id) {
+          setTransportCompanyId((created as { id?: string }).id!);
+        }
         setActionSuccess(`New logistic company "${companyNameEn.trim()}" created successfully.`);
       }
 
@@ -576,6 +616,28 @@ function LogisticsContent() {
       setCompanyError(err instanceof Error ? err.message : "Failed to save company.");
     } finally {
       setCompanySubmitting(false);
+    }
+  };
+
+  const handleDeleteBill = async (id: string, billNumber: string) => {
+    if (!confirm(`Are you sure you want to delete bill "${billNumber}"?`)) return;
+    try {
+      await costService.deleteBill(id);
+      setActionSuccess(`Bill "${billNumber}" deleted successfully.`);
+      await fetchData();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to delete bill");
+    }
+  };
+
+  const handleDeleteCompany = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete company "${name}"?`)) return;
+    try {
+      await settingsService.deleteSupplier(id);
+      setActionSuccess(`Company "${name}" deleted successfully.`);
+      await fetchData();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to delete company");
     }
   };
 
@@ -727,17 +789,25 @@ function LogisticsContent() {
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════
-          VIEW MODE 1: "Adding new tax & clearance fee" (Screenshot 1 / 3)
+          VIEW MODE 1: "Adding new tax & clearance fee" (Exact CSM UI)
          ═══════════════════════════════════════════════════════════════════ */}
       {viewMode === "add-clearance" ? (
-        <div className="space-y-4 pt-1">
+        <div className="space-y-4">
+          {/* Breadcrumb matching exact Screenshot */}
+          <div className="flex items-center gap-1.5 text-[12px] text-slate-500">
+            <LayoutGrid className="h-3.5 w-3.5 text-blue-500" />
+            <span className="text-slate-600 font-medium">Dashboard</span>
+            <span className="text-slate-400">&gt;</span>
+            <span className="text-slate-600">Transport info</span>
+          </div>
+
           {/* Header with Title and Invoice Number on Right */}
           <div className="flex flex-wrap items-end justify-between gap-4 pt-1 pb-1">
             <h1 className="text-[20px] font-bold text-[#2c3e50] tracking-tight">
-              Adding new tax &amp; clearance fee
+              {isShippingMode ? "Adding new shipping fee" : "Adding new tax & clearance fee"}
             </h1>
 
-            {/* Top Right: Invoice Number Input */}
+            {/* Top Right: Invoice Number Input matching Screenshot */}
             <div className="flex flex-col items-start sm:items-end space-y-1">
               <label className="text-[12px] text-slate-700 font-medium">
                 Invoice Number
@@ -747,7 +817,7 @@ function LogisticsContent() {
                 required
                 value={invoiceNumber}
                 onChange={(e) => setInvoiceNumber(e.target.value)}
-                placeholder="IN2026041533"
+                placeholder="IN202611037873"
                 className="w-64 sm:w-72 h-[30px] px-2.5 text-[12px] font-mono border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
               />
             </div>
@@ -764,7 +834,7 @@ function LogisticsContent() {
             {/* Row 1: transport date & transport company */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-[12px] text-slate-600 font-medium">
+                <label className="block text-[12px] text-slate-600 font-medium">
                   transport date
                 </label>
                 <input
@@ -777,9 +847,19 @@ function LogisticsContent() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[12px] text-slate-600 font-medium">
-                  transport company
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[12px] text-slate-600 font-medium">
+                    transport company
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleOpenNewCompanyModal}
+                    className="text-[11px] text-[#1976d2] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>+ New company</span>
+                  </button>
+                </div>
                 <select
                   required
                   value={transportCompanyId}
@@ -799,7 +879,7 @@ function LogisticsContent() {
             {/* Row 2: choose car + clearance fee + tax payment + "+ Add to list" */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end pt-1">
               <div className="md:col-span-4 space-y-1">
-                <label className="text-[12px] text-slate-600 font-medium">
+                <label className="block text-[12px] text-slate-600 font-medium">
                   choose car
                 </label>
                 <select
@@ -817,7 +897,7 @@ function LogisticsContent() {
               </div>
 
               <div className="md:col-span-3 space-y-1">
-                <label className="text-[12px] text-slate-600 font-medium">
+                <label className="block text-[12px] text-slate-600 font-medium">
                   clearance fee
                 </label>
                 <input
@@ -828,12 +908,18 @@ function LogisticsContent() {
                   onChange={(e) =>
                     setInputClearanceFee(e.target.value === "" ? "" : Number(e.target.value))
                   }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddCarToList();
+                    }
+                  }}
                   className="w-full h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
                 />
               </div>
 
               <div className="md:col-span-3 space-y-1">
-                <label className="text-[12px] text-slate-600 font-medium">
+                <label className="block text-[12px] text-slate-600 font-medium">
                   tax payment
                 </label>
                 <input
@@ -844,6 +930,12 @@ function LogisticsContent() {
                   onChange={(e) =>
                     setInputTaxPayment(e.target.value === "" ? "" : Number(e.target.value))
                   }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddCarToList();
+                    }
+                  }}
                   className="w-full h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
                 />
               </div>
@@ -852,10 +944,10 @@ function LogisticsContent() {
                 <button
                   type="button"
                   onClick={handleAddCarToList}
-                  className="h-[30px] px-4 bg-[#20c997] hover:bg-[#1bb386] text-white rounded-[2px] text-[12px] font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
+                  className="w-full h-[30px] px-4 bg-[#00a884] hover:bg-[#008e70] text-white rounded-[2px] text-[12px] font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
                   title="Add to list"
                 >
-                  <PlusCircle className="h-3.5 w-3.5 shrink-0" />
+                  <Plus className="h-3.5 w-3.5 shrink-0" />
                   <span>Add to list</span>
                 </button>
               </div>
@@ -939,9 +1031,9 @@ function LogisticsContent() {
               </div>
             </div>
 
-            {/* Row 3: Paid Amount (stacked) */}
+            {/* Row 3: Paid Amount (Straight aligned) */}
             <div className="space-y-1 pt-1">
-              <label className="text-[12px] text-slate-600 font-medium">
+              <label className="block text-[12px] text-slate-600 font-medium">
                 Paid Amount
               </label>
               <div className="relative w-72">
@@ -959,9 +1051,9 @@ function LogisticsContent() {
               </div>
             </div>
 
-            {/* Row 4: Balance (stacked) */}
+            {/* Row 4: Balance (Straight aligned) */}
             <div className="space-y-1">
-              <label className="text-[12px] text-slate-600 font-medium">
+              <label className="block text-[12px] text-slate-600 font-medium">
                 Balance
               </label>
               <div className="relative w-72">
@@ -975,9 +1067,9 @@ function LogisticsContent() {
               </div>
             </div>
 
-            {/* Row 5: Description */}
+            {/* Row 5: Description (Straight aligned, label directly above textarea) */}
             <div className="space-y-1">
-              <label className="text-[12px] text-slate-600 font-medium">
+              <label className="block text-[12px] text-slate-600 font-medium">
                 Description
               </label>
               <textarea
@@ -985,7 +1077,7 @@ function LogisticsContent() {
                 placeholder="other description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full max-w-xl p-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
+                className="w-full max-w-xl block p-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
               />
             </div>
 
@@ -1014,45 +1106,45 @@ function LogisticsContent() {
         /* ═══════════════════════════════════════════════════════════════════
             VIEW MODE 2: "Tax And Clearance Fee" Dashboard (Screenshot 1 & 2)
            ═══════════════════════════════════════════════════════════════════ */
-        <div className="space-y-4">
-          {/* Page Header & 2 Action Buttons matching Screenshot */}
-          <div className="pt-1">
+        <div className="space-y-3">
+          {/* Top Title & Blue Action Buttons matching CSM Reference */}
+          <div className="space-y-2">
             <h1 className="text-[20px] font-bold text-[#2c3e50] tracking-tight">
-              Tax And Clearance Fee
+              {isShippingMode ? "Shipping Fee" : "Tax And Clearance Fee"}
             </h1>
-
-            <div className="flex items-center gap-2 pt-2.5">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setViewMode("add-clearance")}
-                className="h-[30px] px-3.5 text-xs font-semibold bg-[#1976d2] hover:bg-[#1565c0] text-white rounded-[2px] flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                className="h-[30px] px-3 text-[12px] font-semibold bg-[#1976d2] hover:bg-[#1565c0] text-white rounded-[2px] flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
               >
-                <PlusCircle className="h-3.5 w-3.5" />
+                <Plus className="h-3.5 w-3.5" />
                 <span>New bill</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleOpenNewCompanyModal}
-                className="h-[30px] px-3.5 text-xs font-semibold bg-[#1976d2] hover:bg-[#1565c0] text-white rounded-[2px] flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                className="h-[30px] px-3 text-[12px] font-semibold bg-[#1976d2] hover:bg-[#1565c0] text-white rounded-[2px] flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
               >
-                <PlusCircle className="h-3.5 w-3.5" />
+                <Plus className="h-3.5 w-3.5" />
                 <span>New logistic company</span>
               </button>
             </div>
           </div>
 
-          {/* Tabs: Bill List & Logistic Company */}
-          <div className="pt-1">
-            <div className="flex items-center gap-6 border-b border-slate-200">
+          {/* Main Card with Tabs matching CSM */}
+          <div className="border border-[#dcdfe6] rounded-[2px] bg-white overflow-hidden shadow-2xs">
+            {/* Tabs Bar */}
+            <div className="flex border-b border-[#dcdfe6] text-[12px] bg-slate-50/50">
               <button
                 type="button"
                 onClick={() => setActiveMainTab("bill-list")}
                 className={cn(
-                  "pb-2 text-xs font-semibold cursor-pointer border-b-2 transition-colors",
+                  "px-4 py-2 font-semibold transition-all cursor-pointer border-r border-[#dcdfe6]",
                   activeMainTab === "bill-list"
-                    ? "border-[#1976d2] text-[#1976d2]"
-                    : "border-transparent text-slate-500 hover:text-slate-800"
+                    ? "bg-white text-[#1976d2] border-t-2 border-t-[#1976d2]"
+                    : "text-slate-600 hover:text-slate-800 bg-slate-50"
                 )}
               >
                 Bill List
@@ -1062,176 +1154,137 @@ function LogisticsContent() {
                 type="button"
                 onClick={() => setActiveMainTab("logistic-company")}
                 className={cn(
-                  "pb-2 text-xs font-semibold cursor-pointer border-b-2 transition-colors",
+                  "px-4 py-2 font-semibold transition-all cursor-pointer border-r border-[#dcdfe6]",
                   activeMainTab === "logistic-company"
-                    ? "border-[#1976d2] text-[#1976d2]"
-                    : "border-transparent text-slate-500 hover:text-slate-800"
+                    ? "bg-white text-[#1976d2] border-t-2 border-t-[#1976d2]"
+                    : "text-slate-600 hover:text-slate-800 bg-slate-50"
                 )}
               >
                 Logistic Company
               </button>
             </div>
-          </div>
 
-          {/* Tab 1: Bill List (Screenshot 1) */}
-          {activeMainTab === "bill-list" && (
-            <div className="space-y-2 pt-1">
-              <h2 className="text-[16px] font-bold text-[#2c3e50]">Bill list</h2>
+            {/* Tab 1: Bill List */}
+            {activeMainTab === "bill-list" && (
+              <div className="p-4 space-y-3 text-[12px]">
+                <h2 className="text-[15px] font-bold text-[#2c3e50]">Bill list</h2>
 
-              {/* Filter Inputs matching Screenshot */}
-              <form
-                onSubmit={handleSearch}
-                className="flex flex-wrap items-end justify-between gap-4 pt-1"
-              >
-                {/* Left: Filter Bill */}
-                <div className="space-y-1">
-                  <label className="text-[12px] text-slate-600 font-medium">
-                    Filter Bill
-                  </label>
-                  <div>
-                    <input
-                      type="text"
-                      placeholder="filter by bill no"
-                      value={billNoFilter}
-                      onChange={(e) => setBillNoFilter(e.target.value)}
-                      className="w-64 h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
-                    />
-                  </div>
-                </div>
-
-                {/* Right: Search By Vin Number + Search Button */}
-                <div className="flex items-end gap-2">
+                {/* Filter Row */}
+                <form
+                  onSubmit={handleSearch}
+                  className="flex flex-wrap items-end justify-between gap-4 pt-1"
+                >
+                  {/* Left: Filter Bill */}
                   <div className="space-y-1">
-                    <label className="text-[12px] text-slate-600 font-medium">
-                      Search By Vin Number
+                    <label className="block text-[12px] text-slate-600 font-medium">
+                      Filter Bill
                     </label>
-                    <div>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1.5 text-slate-400 select-none text-[11px] font-mono">
+                        ||||
+                      </span>
                       <input
                         type="text"
-                        placeholder="car vin num"
-                        value={vinFilter}
-                        onChange={(e) => setVinFilter(e.target.value)}
-                        className="w-56 h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
+                        placeholder="filter by bill no"
+                        value={billNoFilter}
+                        onChange={(e) => setBillNoFilter(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleSearch(e);
+                          }
+                        }}
+                        className="w-64 sm:w-72 h-[30px] pl-7 pr-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
                       />
                     </div>
                   </div>
 
-                  <button
-                    type="submit"
-                    className="h-[30px] px-3.5 text-xs font-semibold bg-[#ea4335] hover:bg-[#d32f2f] text-white rounded-[2px] flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  >
-                    <Search className="h-3.5 w-3.5" />
-                    <span>Search</span>
-                  </button>
-                </div>
-              </form>
+                  {/* Right: Search By Vin Number + Search Button */}
+                  <div className="flex items-end gap-2">
+                    <div className="space-y-1">
+                      <label className="block text-[12px] text-slate-600 font-medium">
+                        Search By Vin Number
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-2.5 top-1.5 text-slate-400 select-none text-[11px] font-mono">
+                          ||||
+                        </span>
+                        <input
+                          type="text"
+                          placeholder="car vin num"
+                          value={vinFilter}
+                          onChange={(e) => setVinFilter(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleSearch(e);
+                            }
+                          }}
+                          className="w-56 sm:w-64 h-[30px] pl-7 pr-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
+                        />
+                      </div>
+                    </div>
 
-              {/* Subtitle matching Screenshot */}
-              <p className="text-[11px] text-slate-400 pt-3 pb-0.5">view bill was add</p>
-
-              {/* Table matching Screenshot 1:1 */}
-              <div className="border-t border-slate-200 overflow-x-auto">
-                {loading ? (
-                  <div className="p-6 space-y-3">
-                    <Skeleton className="h-8 w-full" />
-                    <Skeleton className="h-8 w-full" />
-                    <Skeleton className="h-8 w-full" />
+                    <button
+                      type="submit"
+                      className="h-[30px] px-3.5 text-[12px] font-semibold bg-[#ea4335] hover:bg-[#d32f2f] text-white rounded-[2px] flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                    >
+                      <Search className="h-3.5 w-3.5" />
+                      <span>Search</span>
+                    </button>
                   </div>
-                ) : error ? (
-                  <div className="p-6 text-center text-xs text-red-600">{error}</div>
-                ) : (
-                  <table className="w-full text-left border-collapse text-[12px]">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-[#2c3e50] font-bold text-[12px]">
-                        <th className="py-2.5 px-3 w-12 text-slate-700">#</th>
-                        <th
-                          onClick={() => toggleBillSort("billNumber")}
-                          className="py-2.5 px-3 text-slate-700 cursor-pointer select-none hover:text-[#1976d2] transition-colors"
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <span>Bill No</span>
-                            {billSortKey === "billNumber" ? (
-                              billSortOrder === "asc" ? (
-                                <ArrowUp className="h-3 w-3 text-[#1976d2]" />
-                              ) : (
-                                <ArrowDown className="h-3 w-3 text-[#1976d2]" />
-                              )
-                            ) : (
-                              <ArrowUpDown className="h-3 w-3 text-slate-300 opacity-60" />
-                            )}
-                          </div>
-                        </th>
-                        <th
-                          onClick={() => toggleBillSort("paidAmount")}
-                          className="py-2.5 px-3 w-32 text-slate-700 cursor-pointer select-none hover:text-[#1976d2] transition-colors"
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <span>Paid_Amount</span>
-                            {billSortKey === "paidAmount" ? (
-                              billSortOrder === "asc" ? (
-                                <ArrowUp className="h-3 w-3 text-[#1976d2]" />
-                              ) : (
-                                <ArrowDown className="h-3 w-3 text-[#1976d2]" />
-                              )
-                            ) : (
-                              <ArrowUpDown className="h-3 w-3 text-slate-300 opacity-60" />
-                            )}
-                          </div>
-                        </th>
-                        <th
-                          onClick={() => toggleBillSort("balance")}
-                          className="py-2.5 px-3 w-28 text-slate-700 cursor-pointer select-none hover:text-[#1976d2] transition-colors"
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <span>Balance</span>
-                            {billSortKey === "balance" ? (
-                              billSortOrder === "asc" ? (
-                                <ArrowUp className="h-3 w-3 text-[#1976d2]" />
-                              ) : (
-                                <ArrowDown className="h-3 w-3 text-[#1976d2]" />
-                              )
-                            ) : (
-                              <ArrowUpDown className="h-3 w-3 text-slate-300 opacity-60" />
-                            )}
-                          </div>
-                        </th>
-                        <th
-                          onClick={() => toggleBillSort("billDate")}
-                          className="py-2.5 px-3 w-32 text-slate-700 cursor-pointer select-none hover:text-[#1976d2] transition-colors"
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <span>Bill_Date</span>
-                            {billSortKey === "billDate" ? (
-                              billSortOrder === "asc" ? (
-                                <ArrowUp className="h-3 w-3 text-[#1976d2]" />
-                              ) : (
-                                <ArrowDown className="h-3 w-3 text-[#1976d2]" />
-                              )
-                            ) : (
-                              <ArrowUpDown className="h-3 w-3 text-slate-300 opacity-60" />
-                            )}
-                          </div>
-                        </th>
-                        <th
-                          onClick={() => toggleBillSort("supplierName")}
-                          className="py-2.5 px-3 text-slate-700 cursor-pointer select-none hover:text-[#1976d2] transition-colors"
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <span>Supplier</span>
-                            {billSortKey === "supplierName" ? (
-                              billSortOrder === "asc" ? (
-                                <ArrowUp className="h-3 w-3 text-[#1976d2]" />
-                              ) : (
-                                <ArrowDown className="h-3 w-3 text-[#1976d2]" />
-                              )
-                            ) : (
-                              <ArrowUpDown className="h-3 w-3 text-slate-300 opacity-60" />
-                            )}
-                          </div>
-                        </th>
-                        <th className="py-2.5 px-3 w-16 text-center text-slate-700">Action</th>
-                      </tr>
-                    </thead>
+                </form>
+
+                <p className="text-[12px] text-slate-400">view bill was add</p>
+
+                {/* Table matching CSM */}
+                <div className="border border-[#dcdfe6] rounded-[2px] overflow-x-auto bg-white">
+                  {loading ? (
+                    <div className="p-6 space-y-3">
+                      <Skeleton className="h-8 w-full" />
+                      <Skeleton className="h-8 w-full" />
+                      <Skeleton className="h-8 w-full" />
+                    </div>
+                  ) : error ? (
+                    <div className="p-6 text-center text-xs text-red-600">{error}</div>
+                  ) : (
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-[12px]">
+                          <th className="py-2.5 px-3 w-12 text-slate-700">#</th>
+                          <th
+                            onClick={() => toggleBillSort("billNumber")}
+                            className="py-2.5 px-3 text-slate-700 cursor-pointer select-none hover:text-[#1976d2] transition-colors"
+                          >
+                            Bill No
+                          </th>
+                          <th
+                            onClick={() => toggleBillSort("paidAmount")}
+                            className="py-2.5 px-3 w-32 text-slate-700 cursor-pointer select-none hover:text-[#1976d2] transition-colors"
+                          >
+                            Paid_Amount
+                          </th>
+                          <th
+                            onClick={() => toggleBillSort("balance")}
+                            className="py-2.5 px-3 w-28 text-slate-700 cursor-pointer select-none hover:text-[#1976d2] transition-colors"
+                          >
+                            Balance
+                          </th>
+                          <th
+                            onClick={() => toggleBillSort("billDate")}
+                            className="py-2.5 px-3 w-32 text-slate-700 cursor-pointer select-none hover:text-[#1976d2] transition-colors"
+                          >
+                            Bill_Date
+                          </th>
+                          <th
+                            onClick={() => toggleBillSort("supplierName")}
+                            className="py-2.5 px-3 text-slate-700 cursor-pointer select-none hover:text-[#1976d2] transition-colors"
+                          >
+                            Supplier
+                          </th>
+                          <th className="py-2.5 px-3 w-16 text-center text-slate-700"></th>
+                        </tr>
+                      </thead>
                     <tbody>
                       {sortedBills.length === 0 ? (
                         <tr>
@@ -1243,7 +1296,7 @@ function LogisticsContent() {
                         paginatedBills.map((b, index) => (
                           <tr
                             key={b.id}
-                            className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors text-[12px]"
+                            className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors text-xs"
                           >
                             <td className="py-2.5 px-3 text-slate-500 font-mono">
                               {(currentPage - 1) * pageSize + index + 1}
@@ -1267,7 +1320,7 @@ function LogisticsContent() {
                               <button
                                 type="button"
                                 onClick={() => handleOpenBillDetails(b)}
-                                className="h-6 w-6 rounded border border-slate-300 hover:bg-slate-100 inline-flex items-center justify-center text-slate-600 cursor-pointer transition-colors"
+                                className="h-7 w-7 rounded border border-slate-300 hover:bg-slate-100 inline-flex items-center justify-center text-slate-600 cursor-pointer transition-colors shadow-2xs"
                                 title="View bill details"
                               >
                                 <Eye className="h-3.5 w-3.5" />
@@ -1281,39 +1334,49 @@ function LogisticsContent() {
                 )}
 
                 {/* Pagination Controls */}
-                <div className="flex items-center gap-1 pt-4 pb-4">
-                  <button
-                    type="button"
-                    disabled={currentPage <= 1}
-                    onClick={() => setCurrentPage(1)}
-                    className="h-[28px] px-2 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
-                  >
-                    «
-                  </button>
-                  <button
-                    type="button"
-                    disabled={currentPage <= 1}
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    className="h-[28px] px-3 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    type="button"
-                    disabled={currentPage >= totalPages}
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    className="h-[28px] px-3 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
-                  >
-                    Next
-                  </button>
-                  <button
-                    type="button"
-                    disabled={currentPage >= totalPages}
-                    onClick={() => setCurrentPage(totalPages)}
-                    className="h-[28px] px-2 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
-                  >
-                    »
-                  </button>
+                <div className="flex items-center justify-between px-4 py-3 bg-slate-50/60 border-t border-slate-100">
+                  <span className="text-xs text-slate-500">
+                    Showing <span className="font-semibold text-slate-700">{sortedBills.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</span> to{" "}
+                    <span className="font-semibold text-slate-700">{Math.min(currentPage * pageSize, sortedBills.length)}</span> of{" "}
+                    <span className="font-semibold text-slate-700">{sortedBills.length}</span> bills
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={currentPage <= 1}
+                      onClick={() => setCurrentPage(1)}
+                      className="h-7 px-2 text-xs border border-slate-300 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer transition-colors"
+                    >
+                      «
+                    </button>
+                    <button
+                      type="button"
+                      disabled={currentPage <= 1}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      className="h-7 px-2.5 text-xs border border-slate-300 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer transition-colors"
+                    >
+                      Previous
+                    </button>
+                    <span className="h-7 px-3 text-xs font-semibold rounded-lg bg-blue-600 text-white flex items-center justify-center">
+                      {currentPage}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={currentPage >= totalPages}
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      className="h-7 px-2.5 text-xs border border-slate-300 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer transition-colors"
+                    >
+                      Next
+                    </button>
+                    <button
+                      type="button"
+                      disabled={currentPage >= totalPages}
+                      onClick={() => setCurrentPage(totalPages)}
+                      className="h-7 px-2 text-xs border border-slate-300 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer transition-colors"
+                    >
+                      »
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1321,16 +1384,16 @@ function LogisticsContent() {
 
           {/* Tab 2: Logistic Company (Screenshot 2) */}
           {activeMainTab === "logistic-company" && (
-            <div className="space-y-3 pt-1">
+            <div className="p-4 space-y-3 text-[12px]">
               <div>
-                <h2 className="text-[16px] font-bold text-[#2c3e50]">Logistic company</h2>
-                <p className="text-[11px] text-slate-400">all company</p>
+                <h2 className="text-[15px] font-bold text-[#2c3e50]">Logistic company</h2>
+                <p className="text-xs text-slate-400">all company</p>
               </div>
 
-              <div className="border-t border-slate-200 overflow-x-auto">
+              <div className="border border-[#dcdfe6] rounded-[2px] overflow-x-auto bg-white">
                 <table className="w-full text-left border-collapse text-[12px]">
                   <thead>
-                    <tr className="border-b border-slate-200 text-[#2c3e50] font-bold text-[12px]">
+                    <tr className="bg-[#f8fafc] border-b border-[#dcdfe6] text-[#2c3e50] font-semibold text-[12px]">
                       <th
                         onClick={() => toggleCompanySort("code")}
                         className="py-2.5 px-3 w-16 cursor-pointer select-none hover:text-[#1976d2] transition-colors"
@@ -1500,14 +1563,24 @@ function LogisticsContent() {
                               {s.country || "CAMBODIA"}
                             </td>
                             <td className="py-2.5 px-3 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditCompanyModal(s)}
-                                className="h-6 w-6 rounded bg-[#1976d2] hover:bg-[#1565c0] text-white inline-flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
-                                title="Edit company"
-                              >
-                                <Edit2 className="h-3.5 w-3.5" />
-                              </button>
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditCompanyModal(s)}
+                                  className="h-6 w-6 rounded bg-[#1976d2] hover:bg-[#1565c0] text-white inline-flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                  title="Edit company"
+                                >
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCompany(s.id, s.nameKh || s.nameEn)}
+                                  className="h-6 w-6 rounded bg-[#ea4335] hover:bg-[#d32f2f] text-white inline-flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                  title="Delete company"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -1518,6 +1591,7 @@ function LogisticsContent() {
               </div>
             </div>
           )}
+          </div>
         </div>
       )}
 
@@ -1585,7 +1659,7 @@ function LogisticsContent() {
                 </label>
                 <input
                   type="email"
-                  placeholder="ex: example@company.com"
+                  placeholder="ex. example@compny.com"
                   value={companyEmail}
                   onChange={(e) => setCompanyEmail(e.target.value)}
                   className="w-full h-[32px] px-2.5 text-xs border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
@@ -1598,7 +1672,7 @@ function LogisticsContent() {
                 </label>
                 <input
                   type="text"
-                  placeholder="www.companyname.com"
+                  placeholder="www.compnyname.com"
                   value={companyWebsite}
                   onChange={(e) => setCompanyWebsite(e.target.value)}
                   className="w-full h-[32px] px-2.5 text-xs border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
@@ -1617,16 +1691,12 @@ function LogisticsContent() {
                   onChange={(e) => setCompanyCountry(e.target.value)}
                   className="w-full h-[32px] px-2 text-xs border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
                 >
-                  <option value="">-Select-</option>
-                  <option value="Cambodia">Cambodia</option>
-                  <option value="China">China</option>
-                  <option value="Thailand">Thailand</option>
-                  <option value="Vietnam">Vietnam</option>
-                  <option value="United States">United States</option>
-                  <option value="United Arab Emirates">United Arab Emirates</option>
-                  <option value="Japan">Japan</option>
-                  <option value="South Korea">South Korea</option>
-                  <option value="Germany">Germany</option>
+                  <option value="">--Select--</option>
+                  {countryList.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -1636,7 +1706,7 @@ function LogisticsContent() {
                 </label>
                 <input
                   type="text"
-                  placeholder="ex: +85512 345644"
+                  placeholder="ex. +85512 546444"
                   value={companyPhone1}
                   onChange={(e) => setCompanyPhone1(e.target.value)}
                   className="w-full h-[32px] px-2.5 text-xs border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
@@ -1652,7 +1722,7 @@ function LogisticsContent() {
                 </label>
                 <input
                   type="text"
-                  placeholder="ex: +85512 345644"
+                  placeholder="ex. +85512 546444"
                   value={companyPhone2}
                   onChange={(e) => setCompanyPhone2(e.target.value)}
                   className="w-full h-[32px] px-2.5 text-xs border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"

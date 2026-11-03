@@ -56,8 +56,32 @@ async function main() {
     },
   });
 
-  console.log('✅ Super Admin seeded successfully!');
-  console.log('👉 Login: username "admin" / password "admin123"');
+  // 4. Default Countries
+  const countryList = [
+    'BELGUIM',
+    'CAMBODIA',
+    'CANADA',
+    'CHINA',
+    'DENMARK',
+    'DUBAI',
+    'GERMANY',
+    'HONG KONG',
+    'JAPAN',
+    'LAO PDR',
+    'MALAYSIA',
+    'RUSSIA',
+    'TAIWAN',
+    'THAILAND',
+    'USA',
+  ];
+  for (const name of countryList) {
+    await prisma.country.upsert({
+      where: { name },
+      update: {},
+      create: { name },
+    });
+  }
+
 }
 
 main()

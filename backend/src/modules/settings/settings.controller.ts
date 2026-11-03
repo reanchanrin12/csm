@@ -70,6 +70,19 @@ export class SettingsController {
     return this.settingsService.createBrand(data);
   }
 
+  @Patch('brands/:id')
+  updateBrand(
+    @Param('id') id: string,
+    @Body() data: { name: string },
+  ) {
+    return this.settingsService.updateBrand(id, data);
+  }
+
+  @Delete('brands/:id')
+  deleteBrand(@Param('id') id: string) {
+    return this.settingsService.deleteBrand(id);
+  }
+
   @Post('models')
   createModel(
     @Body(new ZodValidationPipe(CreateModelSchema)) data: CreateModelDto,

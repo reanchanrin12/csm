@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { CostsService, CreateBillDto } from './costs.service';
 import type { CostCategory } from '@csm/contracts';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -32,9 +32,23 @@ export class CostsController {
     return this.costsService.updateBill(id, dto);
   }
 
+  @Delete('bills/:id')
+  deleteBill(@Param('id') id: string) {
+    return this.costsService.deleteBill(id);
+  }
+
+  @Delete('items/:id')
+  deleteCostItem(@Param('id') id: string) {
+    return this.costsService.deleteCostItem(id);
+  }
+
   @Get('bills')
-  getBills(@Query('category') category?: CostCategory) {
-    return this.costsService.getBills(category);
+  getBills(
+    @Query('category') category?: CostCategory,
+    @Query('vin') vin?: string,
+    @Query('billNumber') billNumber?: string,
+  ) {
+    return this.costsService.getBills(category, vin, billNumber);
   }
 
   @Get('parts-repairs')

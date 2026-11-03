@@ -33,5 +33,5 @@ pm2 save
 
 echo ""
 echo "============================================="
-echo "✅ CSM DEPLOYMENT / UPDATE COMPLETED!"
+echo " CSM DEPLOYMENT / UPDATE COMPLETED!"
 echo "============================================="

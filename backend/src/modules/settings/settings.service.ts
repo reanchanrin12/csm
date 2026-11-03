@@ -68,6 +68,36 @@ export class SettingsService {
     return this.prisma.carBrand.create({ data });
   }
 
+  async updateBrand(id: string, data: { name: string }) {
+    const existing = await this.prisma.carBrand.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Brand not found');
+    return this.prisma.carBrand.update({
+      where: { id },
+      data: { name: data.name.trim().toUpperCase() },
+    });
+  }
+
+  async deleteBrand(id: string) {
+    const brand = await this.prisma.carBrand.findUnique({
+      where: { id },
+      include: {
+        models: {
+          include: {
+            _count: { select: { vehicles: true } },
+          },
+        },
+      },
+    });
+    if (!brand) throw new NotFoundException('Brand not found');
+    const hasVehicles = brand.models.some((m) => m._count.vehicles > 0);
+    if (hasVehicles) {
+      throw new BadRequestException('Cannot delete brand with active vehicles in inventory');
+    }
+    // Delete associated models first if no vehicles
+    await this.prisma.carModel.deleteMany({ where: { brandId: id } });
+    return this.prisma.carBrand.delete({ where: { id } });
+  }
+
   async createModel(data: CreateModelDto) {
     return this.prisma.carModel.create({ data });
   }

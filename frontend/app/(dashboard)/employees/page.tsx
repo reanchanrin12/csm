@@ -82,9 +82,6 @@ export default function EmployeesPage() {
   const [employeeSubmitting, setEmployeeSubmitting] = useState(false);
   const [employeeFormError, setEmployeeFormError] = useState<string | null>(null);
 
-  // ─────────────────────────────────────────────
-  // Salary Payment Modal State (Exact Screenshot 2)
-  // ─────────────────────────────────────────────
   const [isSalaryModalOpen, setIsSalaryModalOpen] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [paidDate, setPaidDate] = useState(new Date().toISOString().slice(0, 10));

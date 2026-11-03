@@ -111,13 +111,19 @@ const csmNavSections: NavSection[] = [
         name: "Tax & Clearance Fee",
         icon: Receipt,
         roles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "ACCOUNTANT"],
-        subItems: [{ name: "Add new clearance", href: "/logistics?tab=clearance" }],
+        subItems: [
+          { name: "Add new clearance", href: "/logistics?tab=clearance" },
+          { name: "Tax & Clearance list", href: "/logistics" },
+        ],
       },
       {
         name: "Shipping Fee",
         icon: Ship,
         roles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "ACCOUNTANT"],
-        subItems: [{ name: "Add new shipping", href: "/logistics?tab=shipping" }],
+        subItems: [
+          { name: "Add new shipping", href: "/logistics?tab=shipping" },
+          { name: "Shipping list", href: "/logistics" },
+        ],
       },
       {
         name: "Tracking Shipping",
@@ -133,7 +139,7 @@ const csmNavSections: NavSection[] = [
       },
       {
         name: "Repair",
-        href: "/finance?tab=repair",
+        href: "/repairinfo",
         icon: Wrench,
         roles: ["SUPER_ADMIN", "ADMIN", "TECHNICIAN", "STOCK_CONTROLLER", "ACCOUNTANT"],
       },
