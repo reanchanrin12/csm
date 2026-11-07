@@ -106,6 +106,11 @@ function CarPurchasingForm() {
   const [newModelBrandId, setNewModelBrandId] = useState("");
   const [isAddingModel, setIsAddingModel] = useState(false);
 
+  // Quick Add Branch Modal State
+  const [isAddBranchOpen, setIsAddBranchOpen] = useState(false);
+  const [newBranchName, setNewBranchName] = useState("");
+  const [isAddingBranch, setIsAddingBranch] = useState(false);
+
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
 
   // 1. Restore draft on mount ONLY when NOT in edit mode
@@ -438,6 +443,31 @@ function CarPurchasingForm() {
     }
   };
 
+  const handleQuickAddBranch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBranchName.trim()) return;
+    setIsAddingBranch(true);
+    try {
+      const res = (await settingsService.createBranch({
+        name: newBranchName.trim().toUpperCase(),
+      })) as any;
+
+      if (res && res.id) {
+        setOptions((prev) => ({
+          ...prev,
+          branches: [...prev.branches, { id: res.id, name: res.name }],
+        }));
+        handleChange("branchId", res.id);
+        setNewBranchName("");
+        setIsAddBranchOpen(false);
+      }
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err.message || "Failed to add branch");
+    } finally {
+      setIsAddingBranch(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -701,22 +731,32 @@ function CarPurchasingForm() {
               <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
                 Branch / Stock <span className="text-[#718096] text-[12px] font-normal">/ សាខា / ឃ្លាំង</span>
               </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-500">
-                  <Car className="h-4 w-4" />
-                </span>
-                <select
-                  value={formData.branchId}
-                  onChange={(e) => handleChange("branchId", e.target.value)}
-                  className="h-[34px] w-full pl-9 pr-3 text-[13px] border border-[#ccc] rounded bg-white text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+              <div className="flex gap-1.5">
+                <div className="relative flex-1">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-500">
+                    <Car className="h-4 w-4" />
+                  </span>
+                  <select
+                    value={formData.branchId}
+                    onChange={(e) => handleChange("branchId", e.target.value)}
+                    className="h-[34px] w-full pl-9 pr-3 text-[13px] border border-[#ccc] rounded bg-white text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                  >
+                    <option value="">-- Select --</option>
+                    {options.branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAddBranchOpen(true)}
+                  className="h-[34px] px-3 bg-[#f0ad4e] hover:bg-[#ec971f] text-white rounded flex items-center justify-center shadow-xs cursor-pointer transition-colors"
+                  title="Add new branch or stock"
                 >
-                  <option value="">-- Select --</option>
-                  {options.branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
+                  <Plus className="h-4 w-4" />
+                </button>
               </div>
             </div>
 
@@ -1426,6 +1466,59 @@ function CarPurchasingForm() {
                   className="px-4 py-1.5 bg-[#337ab7] text-white text-[13px] font-medium rounded hover:bg-[#286090] cursor-pointer"
                 >
                   {isAddingModel ? "Saving..." : "Save Model"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 7. Quick Add Branch Modal */}
+      {isAddBranchOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded shadow-lg max-w-md w-full border border-[#ccc] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-4 py-3 bg-[#f5f5f5] border-b border-[#e5e5e5]">
+              <h3 className="text-[15px] font-bold text-[#333] flex items-center gap-2">
+                <Plus className="h-4 w-4 text-[#337ab7]" />
+                Add New Branch / Stock <span className="text-[#718096] text-[13px] font-normal">/ បន្ថែមសាខា ឬឃ្លាំងថ្មី</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsAddBranchOpen(false)}
+                className="text-[#999] hover:text-[#333] p-1 text-[18px] leading-none cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+            <form onSubmit={handleQuickAddBranch} className="p-4 space-y-3">
+              <div>
+                <label className="block text-[13px] font-medium text-[#333] mb-1">
+                  Branch / Stock Name * <span className="text-[#718096] text-[12px]">/ ឈ្មោះសាខា ឬឃ្លាំង (ឧ. MAIN SHOWROOM, ឃ្លាំងទួលគោក)</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. MAIN SHOWROOM, WAREHOUSE 1"
+                  value={newBranchName}
+                  onChange={(e) => setNewBranchName(e.target.value)}
+                  className="w-full h-[34px] px-3 text-[13px] uppercase border border-[#ccc] rounded text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                  autoFocus
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#eee]">
+                <button
+                  type="button"
+                  onClick={() => setIsAddBranchOpen(false)}
+                  className="px-4 py-1.5 border border-[#ccc] text-[#333] text-[13px] rounded hover:bg-[#e6e6e6] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isAddingBranch}
+                  className="px-4 py-1.5 bg-[#337ab7] text-white text-[13px] font-medium rounded hover:bg-[#286090] cursor-pointer"
+                >
+                  {isAddingBranch ? "Saving..." : "Save Branch"}
                 </button>
               </div>
             </form>
