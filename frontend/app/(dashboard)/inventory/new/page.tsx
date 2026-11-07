@@ -95,6 +95,17 @@ function CarPurchasingForm() {
   const [newSupplierPhone, setNewSupplierPhone] = useState("");
   const [isAddingSupplier, setIsAddingSupplier] = useState(false);
 
+  // Quick Add Brand Modal State
+  const [isAddBrandOpen, setIsAddBrandOpen] = useState(false);
+  const [newBrandName, setNewBrandName] = useState("");
+  const [isAddingBrand, setIsAddingBrand] = useState(false);
+
+  // Quick Add Model Modal State
+  const [isAddModelOpen, setIsAddModelOpen] = useState(false);
+  const [newModelName, setNewModelName] = useState("");
+  const [newModelBrandId, setNewModelBrandId] = useState("");
+  const [isAddingModel, setIsAddingModel] = useState(false);
+
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
 
   // 1. Restore draft on mount ONLY when NOT in edit mode
@@ -354,6 +365,76 @@ function CarPurchasingForm() {
       alert(err?.response?.data?.message || err.message || "Failed to add supplier");
     } finally {
       setIsAddingSupplier(false);
+    }
+  };
+
+  const handleQuickAddBrand = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBrandName.trim()) return;
+    setIsAddingBrand(true);
+    try {
+      const res = (await settingsService.createBrand({
+        name: newBrandName.trim().toUpperCase(),
+      })) as any;
+
+      if (res && res.id) {
+        setOptions((prev) => {
+          const exists = prev.brands.some((b) => b.id === res.id || b.name === res.name);
+          if (exists) return prev;
+          return {
+            ...prev,
+            brands: [
+              ...prev.brands,
+              { id: res.id, name: res.name, models: [] },
+            ],
+          };
+        });
+        handleChange("brand", res.name);
+        setNewBrandName("");
+        setIsAddBrandOpen(false);
+      }
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err.message || "Failed to add brand");
+    } finally {
+      setIsAddingBrand(false);
+    }
+  };
+
+  const handleQuickAddModel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const resolvedBrandId = newModelBrandId || selectedBrandObj?.id;
+    if (!resolvedBrandId || !newModelName.trim()) {
+      alert("Please select a brand and enter model name.");
+      return;
+    }
+    setIsAddingModel(true);
+    try {
+      const res = (await settingsService.createModel({
+        brandId: resolvedBrandId,
+        name: newModelName.trim().toUpperCase(),
+      })) as any;
+
+      if (res && res.id) {
+        setOptions((prev) => ({
+          ...prev,
+          brands: prev.brands.map((b) => {
+            if (b.id !== resolvedBrandId) return b;
+            const modelExists = b.models.some((m) => m.id === res.id || m.name === res.name);
+            if (modelExists) return b;
+            return {
+              ...b,
+              models: [...b.models, { id: res.id, name: res.name }],
+            };
+          }),
+        }));
+        handleChange("model", res.name);
+        setNewModelName("");
+        setIsAddModelOpen(false);
+      }
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err.message || "Failed to add model");
+    } finally {
+      setIsAddingModel(false);
     }
   };
 
@@ -809,29 +890,39 @@ function CarPurchasingForm() {
               <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
                 Brand <span className="text-[#718096] text-[12px] font-normal">/ ម៉ាករថយន្ត</span>
               </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-amber-600">
-                  <CircleDot className="h-4 w-4" />
-                </span>
-                <select
-                  value={formData.brand}
-                  onChange={(e) => {
-                    const newBrand = e.target.value;
-                    const found = options.brands.find((b) => b.name === newBrand);
-                    handleChange("brand", newBrand);
-                    if (found && found.models.length > 0) {
-                      handleChange("model", found.models[0]?.name || "");
-                    }
-                  }}
-                  className="h-[34px] w-full pl-9 pr-3 text-[13px] border border-[#ccc] rounded bg-white text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+              <div className="flex gap-1.5">
+                <div className="relative flex-1">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-amber-600">
+                    <CircleDot className="h-4 w-4" />
+                  </span>
+                  <select
+                    value={formData.brand}
+                    onChange={(e) => {
+                      const newBrand = e.target.value;
+                      const found = options.brands.find((b) => b.name === newBrand);
+                      handleChange("brand", newBrand);
+                      if (found && found.models.length > 0) {
+                        handleChange("model", found.models[0]?.name || "");
+                      }
+                    }}
+                    className="h-[34px] w-full pl-9 pr-3 text-[13px] border border-[#ccc] rounded bg-white text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                  >
+                    <option value="">-- Select --</option>
+                    {options.brands.map((b) => (
+                      <option key={b.id} value={b.name}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAddBrandOpen(true)}
+                  title="Add new brand"
+                  className="h-[34px] w-[34px] bg-[#f0ad4e] hover:bg-[#ec971f] text-white rounded flex items-center justify-center shrink-0 transition-colors shadow-xs cursor-pointer"
                 >
-                  <option value="">-- Select --</option>
-                  {options.brands.map((b) => (
-                    <option key={b.id} value={b.name}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
+                  <Plus className="h-4 w-4" />
+                </button>
               </div>
             </div>
 
@@ -991,35 +1082,48 @@ function CarPurchasingForm() {
               <label className="block text-[13.5px] font-medium text-[#2d3748] mb-1">
                 Model <span className="text-[#718096] text-[12px] font-normal">/ ម៉ូដែល</span>
               </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-amber-600">
-                  <CircleDot className="h-4 w-4" />
-                </span>
-                {selectedBrandObj && selectedBrandObj.models.length > 0 ? (
-                  <select
-                    value={formData.model}
-                    onChange={(e) => handleChange("model", e.target.value)}
-                    className="h-[34px] w-full pl-9 pr-3 text-[13px] border border-[#ccc] rounded bg-white text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
-                  >
-                    <option value="">-- Select --</option>
-                    {formData.model && !selectedBrandObj.models.some((m) => m.name === formData.model) && (
-                      <option value={formData.model}>{formData.model}</option>
-                    )}
-                    {selectedBrandObj.models.map((m) => (
-                      <option key={m.id} value={m.name}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    placeholder="-- Select --"
-                    value={formData.model}
-                    onChange={(e) => handleChange("model", e.target.value)}
-                    className="h-[34px] w-full pl-9 pr-3 text-[13px] border border-[#ccc] rounded bg-white text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
-                  />
-                )}
+              <div className="flex gap-1.5">
+                <div className="relative flex-1">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-amber-600">
+                    <CircleDot className="h-4 w-4" />
+                  </span>
+                  {selectedBrandObj && selectedBrandObj.models.length > 0 ? (
+                    <select
+                      value={formData.model}
+                      onChange={(e) => handleChange("model", e.target.value)}
+                      className="h-[34px] w-full pl-9 pr-3 text-[13px] border border-[#ccc] rounded bg-white text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                    >
+                      <option value="">-- Select --</option>
+                      {formData.model && !selectedBrandObj.models.some((m) => m.name === formData.model) && (
+                        <option value={formData.model}>{formData.model}</option>
+                      )}
+                      {selectedBrandObj.models.map((m) => (
+                        <option key={m.id} value={m.name}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="-- Select --"
+                      value={formData.model}
+                      onChange={(e) => handleChange("model", e.target.value)}
+                      className="h-[34px] w-full pl-9 pr-3 text-[13px] border border-[#ccc] rounded bg-white text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                    />
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedBrandObj) setNewModelBrandId(selectedBrandObj.id);
+                    setIsAddModelOpen(true);
+                  }}
+                  title="Add new model"
+                  className="h-[34px] w-[34px] bg-[#f0ad4e] hover:bg-[#ec971f] text-white rounded flex items-center justify-center shrink-0 transition-colors shadow-xs cursor-pointer"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
               </div>
             </div>
 
@@ -1192,6 +1296,136 @@ function CarPurchasingForm() {
                   className="px-4 py-1.5 bg-[#337ab7] text-white text-[13px] font-medium rounded hover:bg-[#286090]"
                 >
                   {isAddingSupplier ? "Saving..." : "Save Supplier"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Quick Add Brand Modal */}
+      {isAddBrandOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded shadow-lg max-w-md w-full border border-[#ccc] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-4 py-3 bg-[#f5f5f5] border-b border-[#e5e5e5]">
+              <h3 className="text-[15px] font-bold text-[#333] flex items-center gap-2">
+                <Plus className="h-4 w-4 text-[#337ab7]" />
+                Add New Brand <span className="text-[#718096] text-[13px] font-normal">/ បន្ថែមម៉ាកយានយន្តថ្មី</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsAddBrandOpen(false)}
+                className="text-[#999] hover:text-[#333] p-1 text-[18px] leading-none cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+            <form onSubmit={handleQuickAddBrand} className="p-4 space-y-3">
+              <div>
+                <label className="block text-[13px] font-medium text-[#333] mb-1">
+                  Brand Name * <span className="text-[#718096] text-[12px]">/ ឈ្មោះម៉ាកយានយន្ត (ឧ. MHERO, VOYAH, TOYOTA)</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. MHERO, VOYAH, BYD, TOYOTA"
+                  value={newBrandName}
+                  onChange={(e) => setNewBrandName(e.target.value)}
+                  className="w-full h-[34px] px-3 text-[13px] uppercase border border-[#ccc] rounded text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                  autoFocus
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#eee]">
+                <button
+                  type="button"
+                  onClick={() => setIsAddBrandOpen(false)}
+                  className="px-4 py-1.5 border border-[#ccc] text-[#333] text-[13px] rounded hover:bg-[#e6e6e6] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isAddingBrand}
+                  className="px-4 py-1.5 bg-[#337ab7] text-white text-[13px] font-medium rounded hover:bg-[#286090] cursor-pointer"
+                >
+                  {isAddingBrand ? "Saving..." : "Save Brand"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Quick Add Model Modal */}
+      {isAddModelOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded shadow-lg max-w-md w-full border border-[#ccc] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-4 py-3 bg-[#f5f5f5] border-b border-[#e5e5e5]">
+              <h3 className="text-[15px] font-bold text-[#333] flex items-center gap-2">
+                <Plus className="h-4 w-4 text-[#337ab7]" />
+                Add New Model <span className="text-[#718096] text-[13px] font-normal">/ បន្ថែមម៉ូដែលថ្មី</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsAddModelOpen(false)}
+                className="text-[#999] hover:text-[#333] p-1 text-[18px] leading-none cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+            <form onSubmit={handleQuickAddModel} className="p-4 space-y-3">
+              <div>
+                <label className="block text-[13px] font-medium text-[#333] mb-1">
+                  Select Brand * <span className="text-[#718096] text-[12px]">/ ជ្រើសរើសម៉ាក</span>
+                </label>
+                <select
+                  required
+                  value={newModelBrandId || selectedBrandObj?.id || ""}
+                  onChange={(e) => {
+                    setNewModelBrandId(e.target.value);
+                    const bObj = options.brands.find((b) => b.id === e.target.value);
+                    if (bObj) handleChange("brand", bObj.name);
+                  }}
+                  className="w-full h-[34px] px-3 text-[13px] border border-[#ccc] rounded bg-white text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                >
+                  <option value="">-- Select Brand --</option>
+                  {options.brands.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[13px] font-medium text-[#333] mb-1">
+                  Model Name * <span className="text-[#718096] text-[12px]">/ ឈ្មោះម៉ូដែល (ឧ. 917, FREE, DREAM)</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 917, M817, FREE, DREAM"
+                  value={newModelName}
+                  onChange={(e) => setNewModelName(e.target.value)}
+                  className="w-full h-[34px] px-3 text-[13px] uppercase border border-[#ccc] rounded text-[#555] shadow-xs focus:outline-none focus:border-[#66afe9]"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#eee]">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModelOpen(false)}
+                  className="px-4 py-1.5 border border-[#ccc] text-[#333] text-[13px] rounded hover:bg-[#e6e6e6] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isAddingModel}
+                  className="px-4 py-1.5 bg-[#337ab7] text-white text-[13px] font-medium rounded hover:bg-[#286090] cursor-pointer"
+                >
+                  {isAddingModel ? "Saving..." : "Save Model"}
                 </button>
               </div>
             </form>
