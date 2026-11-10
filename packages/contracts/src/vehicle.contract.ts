@@ -63,8 +63,8 @@ export const CreateVehicleSchema = z.object({
     .min(1, 'Chassis number is required')
     .max(50, 'Chassis number must be at most 50 characters')
     .toUpperCase(),
-  brand: z.string().optional().default('MHERO'),
-  model: z.string().optional().default('817'),
+  brand: z.string().min(1, 'Brand is required'),
+  model: z.string().min(1, 'Model is required'),
   madeYear: z.number().int().optional().default(2026),
   cylinderDisp: z.string().optional(),
   engineNumber: z.string().optional(),

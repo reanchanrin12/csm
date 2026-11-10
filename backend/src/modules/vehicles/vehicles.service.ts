@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -47,14 +48,20 @@ export class VehiclesService {
 
     return this.prisma.$transaction(async (tx) => {
       // 1. Resolve or create brand
-      const brandName = (dto.brand && dto.brand.trim()) || 'MHERO';
+      const brandName = (dto.brand && dto.brand.trim());
+      if (!brandName) {
+        throw new BadRequestException('Brand name is required');
+      }
       let brand = await tx.carBrand.findUnique({ where: { name: brandName } });
       if (!brand) {
         brand = await tx.carBrand.create({ data: { name: brandName } });
       }
 
       // 2. Resolve or create model under brand
-      const modelName = (dto.model && dto.model.trim()) || '817';
+      const modelName = (dto.model && dto.model.trim());
+      if (!modelName) {
+        throw new BadRequestException('Model name is required');
+      }
       let model = await tx.carModel.findFirst({
         where: { brandId: brand.id, name: modelName },
       });
@@ -158,6 +165,9 @@ export class VehiclesService {
       if (dto.registrationCard !== undefined) data.registrationCard = dto.registrationCard;
       if (dto.engineNumber !== undefined) data.engineNumber = dto.engineNumber;
       if (dto.arrivalDate !== undefined) data.arrivalDate = dto.arrivalDate ? new Date(dto.arrivalDate) : null;
+      if (dto.purchasingDate !== undefined) data.purchasingDate = dto.purchasingDate ? new Date(dto.purchasingDate) : null;
+      if (dto.witness !== undefined) data.witness = dto.witness;
+      if (dto.note !== undefined) data.note = dto.note;
       if (dto.coverImageUrl !== undefined) data.coverImageUrl = dto.coverImageUrl || null;
       if (dto.galleryImages !== undefined) data.galleryImages = dto.galleryImages;
       if (dto.purchaseCost !== undefined) data.purchaseCost = dto.purchaseCost;
