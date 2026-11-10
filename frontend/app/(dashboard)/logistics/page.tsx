@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, Suspense } from "react";
+import React, { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -21,6 +21,7 @@ import {
   Edit2,
   Trash2,
   ChevronLeft,
+  ChevronDown,
   Save,
   CheckCircle2,
   AlertCircle,
@@ -170,6 +171,9 @@ function LogisticsContent() {
 
   // Inline "choose car" addition row
   const [selectedCarVin, setSelectedCarVin] = useState("");
+  const [carSearchTerm, setCarSearchTerm] = useState("");
+  const [isCarDropdownOpen, setIsCarDropdownOpen] = useState(false);
+  const carDropdownRef = useRef<HTMLDivElement>(null);
   const [inputClearanceFee, setInputClearanceFee] = useState<number | "">("");
   const [inputTaxPayment, setInputTaxPayment] = useState<number | "">("");
 
@@ -179,6 +183,52 @@ function LogisticsContent() {
   const [description, setDescription] = useState("");
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Close car dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (carDropdownRef.current && !carDropdownRef.current.contains(e.target as Node)) {
+        setIsCarDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredCarOptions = useMemo(() => {
+    if (!carSearchTerm.trim()) return vehicles;
+    const q = carSearchTerm.toLowerCase().trim();
+    return vehicles.filter(
+      (v) =>
+        v.vin.toLowerCase().includes(q) ||
+        (v.brand && v.brand.toLowerCase().includes(q)) ||
+        (v.model && v.model.toLowerCase().includes(q)) ||
+        (v.color && v.color.toLowerCase().includes(q))
+    );
+  }, [vehicles, carSearchTerm]);
+
+  useEffect(() => {
+    if (!selectedCarVin) {
+      setCarSearchTerm("");
+    } else {
+      const v = vehicles.find((x) => x.vin === selectedCarVin);
+      if (v) {
+        setCarSearchTerm(`${v.brand} ${v.model} (${v.vin})`);
+      }
+    }
+  }, [selectedCarVin, vehicles]);
+
+  const handleSelectCar = (v: VehicleOption) => {
+    setSelectedCarVin(v.vin);
+    setCarSearchTerm(`${v.brand} ${v.model} (${v.vin})`);
+    setIsCarDropdownOpen(false);
+  };
+
+  const handleClearCarSelection = () => {
+    setSelectedCarVin("");
+    setCarSearchTerm("");
+    setIsCarDropdownOpen(true);
+  };
 
   // ── "Adding new logistic company" Modal State (Screenshot 4) ───────────
   const [isCompanyDialogOpen, setIsCompanyDialogOpen] = useState(false);
@@ -931,20 +981,108 @@ function LogisticsContent() {
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end pt-1">
               <div className="md:col-span-4 space-y-1">
                 <label className="block text-[12px] text-slate-600 font-medium">
-                  choose car
+                  choose car / វាយលេខតួ (VIN)
                 </label>
-                <select
-                  value={selectedCarVin}
-                  onChange={(e) => setSelectedCarVin(e.target.value)}
-                  className="w-full h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
-                >
-                  <option value="">choose car</option>
-                  {vehicles.map((v) => (
-                    <option key={v.vin} value={v.vin}>
-                      {v.brand} {v.model} ({v.vin}) {v.madeYear ? `- ${v.madeYear}` : ""} {v.color ? `- ${v.color}` : ""}
-                    </option>
-                  ))}
-                </select>
+                <div ref={carDropdownRef} className="relative w-full">
+                  <div className="relative flex items-center">
+                    <Search className="absolute left-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Type VIN (លេខតួ) or search car..."
+                      value={carSearchTerm}
+                      onFocus={() => setIsCarDropdownOpen(true)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCarSearchTerm(val);
+                        setIsCarDropdownOpen(true);
+                        // If exact match found, auto-select
+                        const match = vehicles.find(
+                          (v) => v.vin.toLowerCase() === val.toLowerCase().trim()
+                        );
+                        if (match) {
+                          setSelectedCarVin(match.vin);
+                        } else if (selectedCarVin) {
+                          setSelectedCarVin("");
+                        }
+                      }}
+                      className="w-full h-[30px] pl-8 pr-14 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
+                    />
+                    <div className="absolute right-1.5 flex items-center gap-1">
+                      {carSearchTerm && (
+                        <button
+                          type="button"
+                          onClick={handleClearCarSelection}
+                          className="h-5 w-5 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
+                          title="Clear search"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setIsCarDropdownOpen((prev) => !prev)}
+                        className="h-5 w-5 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
+                        title="Toggle list"
+                      >
+                        <ChevronDown
+                          className={cn(
+                            "h-3.5 w-3.5 transition-transform text-slate-500",
+                            isCarDropdownOpen && "rotate-180"
+                          )}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Dropdown Menu (Floating list) */}
+                  {isCarDropdownOpen && (
+                    <div className="absolute z-50 left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white border border-slate-200 rounded-[3px] shadow-xl text-[12px]">
+                      {filteredCarOptions.length === 0 ? (
+                        <div className="p-3 text-center text-slate-400 italic text-[11px]">
+                          No car matches &quot;{carSearchTerm}&quot;
+                        </div>
+                      ) : (
+                        filteredCarOptions.map((v) => {
+                          const isSelected = v.vin === selectedCarVin;
+                          return (
+                            <div
+                              key={v.vin}
+                              onClick={() => handleSelectCar(v)}
+                              className={cn(
+                                "px-3 py-2 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors flex items-center justify-between",
+                                isSelected
+                                  ? "bg-blue-50 text-[#1976d2] font-semibold"
+                                  : "hover:bg-slate-50 text-slate-800"
+                              )}
+                            >
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold text-slate-900">
+                                    {v.brand} {v.model}
+                                  </span>
+                                  <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
+                                    {v.madeYear || 2026}
+                                  </span>
+                                  {v.color && (
+                                    <span className="text-[10px] text-slate-500 uppercase">
+                                      • {v.color}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="font-mono text-[11px] text-[#1976d2]">
+                                  VIN: {v.vin}
+                                </div>
+                              </div>
+                              {isSelected && (
+                                <Check className="h-4 w-4 text-[#1976d2] shrink-0" />
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="md:col-span-3 space-y-1">
@@ -1650,7 +1788,7 @@ function LogisticsContent() {
           MODAL: "Adding new logistic company" (Screenshot 4)
          ═══════════════════════════════════════════════════════════════════ */}
       <Dialog open={isCompanyDialogOpen} onOpenChange={setIsCompanyDialogOpen}>
-        <DialogContent className="max-w-[540px] p-0 overflow-hidden rounded-[4px] border border-slate-200 shadow-2xl">
+        <DialogContent className="sm:max-w-[540px] max-w-[95vw] w-full p-0 overflow-hidden rounded-[4px] border border-slate-200 shadow-2xl">
           {/* Dark blue modal header */}
           <div className="bg-[#102a4e] text-white px-5 py-3 flex items-center justify-between">
             <DialogTitle className="text-[14px] font-semibold tracking-wide text-white">
@@ -1834,7 +1972,7 @@ function LogisticsContent() {
           MODAL: View / Edit Bill Details (Exact Reference Screenshot)
          ═══════════════════════════════════════════════════════════════════ */}
       <Dialog open={!!selectedBill} onOpenChange={(open) => !open && setSelectedBill(null)}>
-        <DialogContent className="max-w-[880px] p-0 overflow-hidden rounded-[4px] border border-slate-200 shadow-2xl">
+        <DialogContent className="sm:max-w-[940px] max-w-[95vw] w-full p-0 overflow-hidden rounded-[4px] border border-slate-200 shadow-2xl">
           {/* Dark blue modal header */}
           <div className="bg-[#102a4e] text-white px-5 py-3 flex items-center justify-between">
             <DialogTitle className="text-[14px] font-semibold tracking-wide text-white">
@@ -1850,7 +1988,7 @@ function LogisticsContent() {
           </div>
 
           {selectedBill && (
-            <div className="p-5 space-y-4 text-xs bg-white">
+            <div className="p-5 space-y-4 text-xs bg-white max-h-[85vh] overflow-y-auto">
               {billSaveError && (
                 <div className="p-2.5 rounded bg-red-50 border border-red-200 text-red-700 text-xs">
                   {billSaveError}
