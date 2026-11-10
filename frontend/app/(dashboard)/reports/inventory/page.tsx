@@ -11,6 +11,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { vehicleService } from "@/lib/api";
+import { TablePagination } from "@/components/ui/table-pagination";
 import type { VehicleSummary } from "@csm/contracts";
 
 export default function InventoryReportPage() {
@@ -40,6 +41,10 @@ function InventoryReportContent() {
   const [filterModel, setFilterModel] = useState("");
   const [filterVin, setFilterVin] = useState("");
   const [filterYear, setFilterYear] = useState("");
+
+  // Pagination & Limit
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Date filters (for Purchased Report / Screenshot 6)
   const [dateFrom, setDateFrom] = useState(() => {
@@ -72,7 +77,13 @@ function InventoryReportContent() {
   const handleDateSearch = () => {
     setAppliedFrom(dateFrom);
     setAppliedTo(dateTo);
+    setCurrentPage(1);
   };
+
+  // Reset page when filter criteria change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [paramView, filterModel, filterVin, filterYear, pageSize]);
 
   const formatMoney = (val?: number | null) => {
     const num = Number(val || 0);
@@ -124,6 +135,13 @@ function InventoryReportContent() {
       return true;
     });
   }, [vehicles, isPurchased, appliedFrom, appliedTo, filterModel, filterVin, filterYear]);
+
+  // Paginated dataset
+  const paginatedVehicles = useMemo(() => {
+    if (pageSize === -1) return filteredVehicles;
+    const start = (currentPage - 1) * pageSize;
+    return filteredVehicles.slice(start, start + pageSize);
+  }, [filteredVehicles, currentPage, pageSize]);
 
   // Export CSV
   const handleExportCsv = () => {
@@ -288,8 +306,28 @@ function InventoryReportContent() {
         </button>
       </div>
 
-      {/* ── 5. Subtitle (Exact Screenshots 5 & 6) ── */}
-      <p className="text-xs text-slate-500 mb-2">costomize and view brand list</p>
+      {/* ── 5. Subtitle & Page Limit Selector (Exact match) ── */}
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs text-slate-500">costomize and view brand list</p>
+        <div className="flex items-center gap-1.5 text-xs text-slate-600">
+          <span>Show:</span>
+          <select
+            value={pageSize}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setCurrentPage(1);
+            }}
+            className="h-7 px-2 border border-slate-300 rounded bg-white text-xs text-slate-700 focus:outline-none focus:border-[#337ab7]"
+          >
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={-1}>All</option>
+          </select>
+          <span>entries</span>
+        </div>
+      </div>
 
       {/* ── 6. 16-Column Dark Blue Table (Exact Screenshots 5 & 6) ── */}
       <div className="border border-[#1f385c] rounded overflow-hidden">
@@ -329,63 +367,79 @@ function InventoryReportContent() {
                   </td>
                 </tr>
               ) : (
-                filteredVehicles.map((v, idx) => (
-                  <tr key={v.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-2 px-2.5 border-r border-slate-200 text-center text-slate-600">
-                      {idx + 1}
-                    </td>
-                    <td className="py-2 px-3 border-r border-slate-200 font-semibold text-slate-800">
-                      {v.brand}
-                    </td>
-                    <td className="py-2 px-3 border-r border-slate-200 text-slate-700">
-                      {v.model}
-                    </td>
-                    <td className="py-2 px-3 border-r border-slate-200 font-mono text-[11px] text-slate-700">
-                      {v.vin}
-                    </td>
-                    <td className="py-2 px-3 border-r border-slate-200 text-slate-600 uppercase text-[11px]">
-                      {v.exteriorColor || "—"}
-                    </td>
-                    <td className="py-2 px-2.5 border-r border-slate-200 text-center text-slate-700">
-                      {v.madeYear || "—"}
-                    </td>
-                    <td className="py-2 px-3 border-r border-slate-200 text-slate-600 text-[11px]">
-                      {v.engineNumber || "N/A"}
-                    </td>
-                    <td className="py-2 px-3 border-r border-slate-200 text-right font-medium text-slate-800">
-                      {formatMoney(v.purchaseCost)}
-                    </td>
-                    <td className="py-2 px-3 border-r border-slate-200 text-slate-600 uppercase text-[11px]">
-                      {v.branchName || "PHNOM PENH"}
-                    </td>
-                    <td className="py-2 px-3 border-r border-slate-200 text-right text-slate-700">
-                      {formatMoney(v.clearanceCost)}
-                    </td>
-                    <td className="py-2 px-3 border-r border-slate-200 text-right text-slate-700">
-                      {formatMoney(v.taxCost)}
-                    </td>
-                    <td className="py-2 px-3 border-r border-slate-200 text-right text-slate-700">
-                      {formatMoney(v.transportCost)}
-                    </td>
-                    <td className="py-2 px-3 border-r border-slate-200 text-right text-slate-700">
-                      {formatMoney(v.containerCost)}
-                    </td>
-                    <td className="py-2 px-3 border-r border-slate-200 text-right text-slate-700">
-                      {formatMoney(v.laborCost)}
-                    </td>
-                    <td className="py-2 px-3 border-r border-slate-200 text-right text-slate-700">
-                      {formatMoney(v.repairCost)}
-                    </td>
-                    <td className="py-2 px-3 text-right font-bold text-slate-900">
-                      {formatMoney(v.totalLandedCost)}
-                    </td>
-                  </tr>
-                ))
+                paginatedVehicles.map((v, idx) => {
+                  const itemIndex = pageSize === -1 ? idx + 1 : (currentPage - 1) * pageSize + idx + 1;
+                  return (
+                    <tr key={v.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-2 px-2.5 border-r border-slate-200 text-center text-slate-600">
+                        {itemIndex}
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-200 font-semibold text-slate-800">
+                        {v.brand}
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-200 text-slate-700">
+                        {v.model}
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-200 font-mono text-[11px] text-slate-700">
+                        {v.vin}
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-200 text-slate-600 uppercase text-[11px]">
+                        {v.exteriorColor || "—"}
+                      </td>
+                      <td className="py-2 px-2.5 border-r border-slate-200 text-center text-slate-700">
+                        {v.madeYear || "—"}
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-200 text-slate-600 text-[11px]">
+                        {v.engineNumber || "N/A"}
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-200 text-right font-medium text-slate-800">
+                        {formatMoney(v.purchaseCost)}
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-200 text-slate-600 uppercase text-[11px]">
+                        {v.branchName || "PHNOM PENH"}
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-200 text-right text-slate-700">
+                        {formatMoney(v.clearanceCost)}
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-200 text-right text-slate-700">
+                        {formatMoney(v.taxCost)}
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-200 text-right text-slate-700">
+                        {formatMoney(v.transportCost)}
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-200 text-right text-slate-700">
+                        {formatMoney(v.containerCost)}
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-200 text-right text-slate-700">
+                        {formatMoney(v.laborCost)}
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-200 text-right text-slate-700">
+                        {formatMoney(v.repairCost)}
+                      </td>
+                      <td className="py-2 px-3 text-right font-bold text-slate-900">
+                        {formatMoney(v.totalLandedCost)}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* ── 7. Pagination Controls ── */}
+      {filteredVehicles.length > 0 && pageSize !== -1 && (
+        <div className="mt-3">
+          <TablePagination
+            currentPage={currentPage}
+            pageSize={pageSize}
+            totalItems={filteredVehicles.length}
+            onPageChange={setCurrentPage}
+            className="border-0 bg-transparent px-0"
+          />
+        </div>
+      )}
     </div>
   );
 }

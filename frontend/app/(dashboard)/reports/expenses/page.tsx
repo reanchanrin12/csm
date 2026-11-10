@@ -11,6 +11,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { expenseService } from "@/lib/api";
+import { TablePagination } from "@/components/ui/table-pagination";
 import type { OperatingExpenseItem } from "@csm/contracts";
 
 export default function ExpensesReportPage() {
@@ -35,6 +36,10 @@ function ExpensesReportContent() {
 
   const [expenses, setExpenses] = useState<OperatingExpenseItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Pagination & Page Limit
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Filter states
   const [dateFrom, setDateFrom] = useState(() => {
@@ -102,6 +107,17 @@ function ExpensesReportContent() {
     const num = Number(val || 0);
     return "$" + num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [paramView, appliedFrom, appliedTo, appliedType, pageSize]);
+
+  // Paginated expenses
+  const paginatedExpenses = useMemo(() => {
+    if (pageSize === -1) return filteredExpenses;
+    const start = (currentPage - 1) * pageSize;
+    return filteredExpenses.slice(start, start + pageSize);
+  }, [filteredExpenses, currentPage, pageSize]);
 
   // Grouping for Summary View
   const summaryRows = useMemo(() => {
@@ -322,7 +338,7 @@ function ExpensesReportContent() {
                     </td>
                   </tr>
                 ) : (
-                  filteredExpenses.map((exp, idx) => (
+                  paginatedExpenses.map((exp, idx) => (
                     <tr key={idx} className="hover:bg-slate-50 transition-colors">
                       <td className="py-2 px-3 border-r border-slate-200 font-medium text-slate-800">
                         {exp.expenseTo || "OTHER"}
@@ -359,6 +375,38 @@ function ExpensesReportContent() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Controls */}
+          {filteredExpenses.length > 0 && pageSize !== -1 && (
+            <div className="p-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 bg-white">
+              <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                <span>Show:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="h-7 px-2 border border-slate-300 rounded bg-white text-xs text-slate-700 focus:outline-none focus:border-[#337ab7]"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={-1}>All</option>
+                </select>
+                <span>entries</span>
+              </div>
+
+              <TablePagination
+                currentPage={currentPage}
+                pageSize={pageSize}
+                totalItems={filteredExpenses.length}
+                onPageChange={setCurrentPage}
+                className="border-0 bg-transparent p-0"
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
