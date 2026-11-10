@@ -2,31 +2,16 @@
 
 import React, { useState, useEffect, useMemo, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
-  DollarSign,
-  Download,
-  Calendar,
+  TableProperties,
+  Filter,
   Search,
+  FileSpreadsheet,
   RefreshCw,
-  ChevronRight,
-  Receipt,
-  ListFilter,
-  BarChart3,
-  FileText,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { TablePagination } from "@/components/ui/table-pagination";
 import { expenseService } from "@/lib/api";
 import type { OperatingExpenseItem } from "@csm/contracts";
-import { exportToCsv } from "@/lib/export-csv";
-import {
-  getTodayDateString,
-  getStartOfMonthDateString,
-  getEndOfMonthDateString,
-} from "@/lib/date-utils";
 
 export default function ExpensesReportPage() {
   return (
@@ -44,37 +29,31 @@ export default function ExpensesReportPage() {
 }
 
 function ExpensesReportContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const paramView = searchParams.get("view"); // "details" | "summary"
-
-  const [activeView, setActiveView] = useState<"details" | "summary">("details");
-
-  useEffect(() => {
-    if (paramView === "summary") {
-      setActiveView("summary");
-    } else {
-      setActiveView("details");
-    }
-  }, [paramView]);
+  const isSummary = paramView === "summary";
 
   const [expenses, setExpenses] = useState<OperatingExpenseItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
-  // Filters
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [datePreset, setDatePreset] = useState<"all" | "this_month" | "today">("all");
+  // Filter states
+  const [dateFrom, setDateFrom] = useState(() => {
+    const today = new Date();
+    return today.toISOString().slice(0, 10);
+  });
+  const [dateTo, setDateTo] = useState(() => {
+    const today = new Date();
+    return today.toISOString().slice(0, 10);
+  });
+  const [expenseType, setExpenseType] = useState("All");
 
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  // Applied filter state after user clicks Search
+  const [appliedFrom, setAppliedFrom] = useState("");
+  const [appliedTo, setAppliedTo] = useState("");
+  const [appliedType, setAppliedType] = useState("All");
 
-  const loadData = async (isManualRefresh = false) => {
-    if (isManualRefresh) setRefreshing(true);
-    else setLoading(true);
+  const loadData = async () => {
+    setLoading(true);
     try {
       const res = await expenseService.list();
       setExpenses(res?.expenses || []);
@@ -82,7 +61,6 @@ function ExpensesReportContent() {
       console.error("Failed to load expense report:", err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
@@ -90,475 +68,298 @@ function ExpensesReportContent() {
     loadData();
   }, []);
 
-  // Preset Date Filter Helpers
-  const handlePresetDate = (type: "today" | "this_month" | "all") => {
-    setDatePreset(type);
-    if (type === "all") {
-      setStartDate("");
-      setEndDate("");
-    } else if (type === "today") {
-      const formatted = getTodayDateString();
-      setStartDate(formatted);
-      setEndDate(formatted);
-    } else if (type === "this_month") {
-      setStartDate(getStartOfMonthDateString());
-      setEndDate(getEndOfMonthDateString());
-    }
+  const handleSearch = () => {
+    setAppliedFrom(dateFrom);
+    setAppliedTo(dateTo);
+    setAppliedType(expenseType);
   };
 
-  // Filtered Data
+  // Distinct types for dropdown
+  const expenseTypeOptions = useMemo(() => {
+    const set = new Set<string>();
+    expenses.forEach((e) => {
+      if (e.expenseTo) set.add(e.expenseTo);
+    });
+    return ["All", ...Array.from(set)];
+  }, [expenses]);
+
+  // Filtered expenses
   const filteredExpenses = useMemo(() => {
     return expenses.filter((item) => {
-      if (startDate && item.expenseDate && item.expenseDate.slice(0, 10) < startDate) return false;
-      if (endDate && item.expenseDate && item.expenseDate.slice(0, 10) > endDate) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const toMatch = (item.expenseTo || "").toLowerCase();
-        const detailsMatch = (item.details || "").toLowerCase();
-        const catMatch = ((item as { category?: string }).category || "").toLowerCase();
-        if (!toMatch.includes(q) && !detailsMatch.includes(q) && !catMatch.includes(q)) return false;
-      }
+      const itemDate = item.expenseDate
+        ? item.expenseDate.slice(0, 10)
+        : item.createdAt
+        ? item.createdAt.slice(0, 10)
+        : "";
+      if (appliedFrom && itemDate && itemDate < appliedFrom) return false;
+      if (appliedTo && itemDate && itemDate > appliedTo) return false;
+      if (appliedType !== "All" && item.expenseTo !== appliedType) return false;
       return true;
     });
-  }, [expenses, startDate, endDate, searchQuery]);
+  }, [expenses, appliedFrom, appliedTo, appliedType]);
 
-  // Reset pagination on filter change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [startDate, endDate, searchQuery]);
-
-  // Monthly breakdown for summary view
-  const monthlySummary = useMemo(() => {
-    const map = new Map<string, { count: number; total: number }>();
-    filteredExpenses.forEach((item) => {
-      const m = item.expenseDate ? item.expenseDate.slice(0, 7) : "Unknown";
-      const existing = map.get(m) || { count: 0, total: 0 };
-      map.set(m, {
-        count: existing.count + 1,
-        total: existing.total + (Number(item.amount) || 0),
-      });
-    });
-    return Array.from(map.entries())
-      .map(([month, data]) => ({ month, ...data }))
-      .sort((a, b) => b.month.localeCompare(a.month));
-  }, [filteredExpenses]);
-
-  // Receiver breakdown for summary view
-  const receiverSummary = useMemo(() => {
-    const map = new Map<string, { count: number; total: number }>();
-    filteredExpenses.forEach((item) => {
-      const receiver = item.expenseTo || "Unspecified";
-      const existing = map.get(receiver) || { count: 0, total: 0 };
-      map.set(receiver, {
-        count: existing.count + 1,
-        total: existing.total + (Number(item.amount) || 0),
-      });
-    });
-    return Array.from(map.entries())
-      .map(([receiver, data]) => ({ receiver, ...data }))
-      .sort((a, b) => b.total - a.total);
-  }, [filteredExpenses]);
-
-  // Export CSV
-  const handleExportCsv = () => {
-    if (activeView === "summary") {
-      const headers = ["Month", "Transactions", "Total Amount ($)", "Average/Transaction ($)"];
-      const rows = monthlySummary.map((m) => [
-        m.month,
-        m.count,
-        m.total.toFixed(2),
-        m.count > 0 ? (m.total / m.count).toFixed(2) : "0.00",
-      ]);
-      exportToCsv("Expense_Summary_Report", headers, rows);
-    } else {
-      const headers = ["Expense Date", "Expense To", "Amount ($)", "Details / Note"];
-      const rows = filteredExpenses.map((item) => [
-        item.expenseDate ? item.expenseDate.slice(0, 10) : "",
-        item.expenseTo,
-        item.amount,
-        item.details || "",
-      ]);
-      exportToCsv("Expense_Details_Report", headers, rows);
-    }
+  const formatMoney = (val?: number | null) => {
+    const num = Number(val || 0);
+    return "$" + num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  const paginatedExpenses = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredExpenses.slice(start, start + pageSize);
-  }, [filteredExpenses, currentPage, pageSize]);
+  // Grouping for Summary View
+  const summaryRows = useMemo(() => {
+    const map = new Map<string, { count: number; totalAmount: number }>();
+    filteredExpenses.forEach((e) => {
+      const cat = e.expenseTo || "OTHER";
+      const existing = map.get(cat) || { count: 0, totalAmount: 0 };
+      existing.count += 1;
+      existing.totalAmount += Number(e.amount || 0);
+      map.set(cat, existing);
+    });
 
-  const totalExpenseAmount = useMemo(() => {
-    return filteredExpenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    return Array.from(map.entries()).map(([type, data]) => ({
+      type,
+      count: data.count,
+      amount: data.totalAmount,
+    }));
   }, [filteredExpenses]);
 
-  const changeView = (view: "details" | "summary") => {
-    setActiveView(view);
-    router.push(`/reports/expenses?view=${view}`);
+  // Totals
+  const totalAmount = useMemo(() => {
+    return filteredExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  }, [filteredExpenses]);
+
+  const handleExportCsv = () => {
+    if (isSummary) {
+      const headers = ["Expense Type", "Expense Count", "Expense Amount"];
+      const rows = summaryRows.map((r) => [r.type, r.count, r.amount.toFixed(2)]);
+      rows.push(["Total", filteredExpenses.length, totalAmount.toFixed(2)]);
+      const csv =
+        "data:text/csv;charset=utf-8," +
+        [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+      const link = document.createElement("a");
+      link.href = encodeURI(csv);
+      link.download = `expense_summary_${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+    } else {
+      const headers = ["Expense Type", "Reference", "Date", "Amount", "Note", "By"];
+      const rows = filteredExpenses.map((e) => [
+        e.expenseTo || "OTHER",
+        e.id.slice(0, 8).toUpperCase(),
+        e.expenseDate ? e.expenseDate.slice(0, 10) : e.createdAt.slice(0, 10),
+        Number(e.amount || 0).toFixed(2),
+        `"${(e.details || "").replace(/"/g, '""')}"`,
+        "admin",
+      ]);
+      rows.push(["Total", "", "", totalAmount.toFixed(2), "", ""]);
+      const csv =
+        "data:text/csv;charset=utf-8," +
+        [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+      const link = document.createElement("a");
+      link.href = encodeURI(csv);
+      link.download = `expense_details_${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+    }
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-5 max-w-[1600px] mx-auto">
-      {/* ── 1. Breadcrumbs & Page Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
-        <div>
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mb-1">
-            <Link href="/" className="hover:text-[#1c3d73] transition-colors">
-              Dashboard
-            </Link>
-            <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
-            <Link href="/reports/expenses" className="hover:text-[#1c3d73] transition-colors">
-              Expense Reports
-            </Link>
-            <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
-            <span className="text-[#1c3d73] font-semibold">
-              {activeView === "summary" ? "Expense Summary" : "Expense Details"}
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#1c3d73] flex items-center justify-center shadow-xs">
-              <Receipt className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-                {activeView === "summary" ? "Expense Summary (របាយការណ៍សង្ខេបចំណាយ)" : "Expense Details (របាយការណ៍លម្អិតចំណាយ)"}
-              </h1>
-              <p className="text-xs text-slate-500">
-                តាមដានរាល់កំណត់ត្រាចំណាយប្រតិបត្តិការ ថ្លៃជួល និងចំណាយផ្សេងៗក្នុងក្រុមហ៊ុន
-              </p>
-            </div>
-          </div>
+    <div className="bg-white min-h-[calc(100vh-80px)] font-sans antialiased text-[#212529] pb-12">
+      {/* ── 1. Breadcrumbs (Exact Screenshots 3 & 4) ── */}
+      <div className="flex items-center gap-1.5 px-3.5 py-2 bg-[#f0f3f6] border border-[#e2e8f0] rounded text-xs text-slate-600 w-fit mb-4">
+        <TableProperties className="h-3.5 w-3.5 text-[#0066cc]" />
+        <Link href="/" className="text-[#0066cc] hover:underline font-normal">
+          Dashboard
+        </Link>
+        <span className="text-slate-400 font-light">&gt;</span>
+        <span className="text-slate-500">Report Expense Summary</span>
+      </div>
+
+      {/* ── 2. Filter Card (Exact Screenshots 3 & 4) ── */}
+      <div className="border border-[#e2e8f0] rounded p-4 mb-4 bg-white shadow-2xs">
+        <div className="text-[13px] font-bold text-[#333] flex items-center gap-1.5 mb-3">
+          <Filter className="h-3.5 w-3.5 text-[#555]" />
+          <span>Filter</span>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => loadData(true)}
-            disabled={loading || refreshing}
-            className="h-9 rounded-xl border-slate-200 text-slate-700 hover:bg-slate-100 transition-all cursor-pointer font-medium"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshing ? "animate-spin text-[#1c3d73]" : ""}`} />
-            <span>ផ្ទុកឡើងវិញ</span>
-          </Button>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex flex-wrap items-end gap-3 sm:gap-4">
+            {/* Date from */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-semibold text-slate-600">Date from</label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="h-8 px-2.5 text-xs border border-slate-300 rounded focus:border-[#337ab7] focus:outline-none w-[150px]"
+              />
+            </div>
 
-          <Button
-            size="sm"
+            {/* Date to */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-semibold text-slate-600">Date to</label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="h-8 px-2.5 text-xs border border-slate-300 rounded focus:border-[#337ab7] focus:outline-none w-[150px]"
+              />
+            </div>
+
+            {/* Expense Types dropdown (Only in Expense Details / Screenshot 3) */}
+            {!isSummary && (
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-semibold text-slate-600">Expense Types</label>
+                <select
+                  value={expenseType}
+                  onChange={(e) => setExpenseType(e.target.value)}
+                  className="h-8 px-2.5 text-xs border border-slate-300 rounded focus:border-[#337ab7] focus:outline-none bg-white min-w-[140px]"
+                >
+                  {expenseTypeOptions.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Red Search Button (Exact #d9534f) */}
+            <button
+              onClick={handleSearch}
+              className="h-8 px-4 bg-[#d9534f] hover:bg-[#c9302c] text-white text-xs font-medium rounded flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Search className="h-3 w-3" />
+              <span>Search</span>
+            </button>
+          </div>
+
+          {/* Blue Export out Button (Exact #337ab7) */}
+          <button
             onClick={handleExportCsv}
-            className="h-9 rounded-xl bg-[#1c3d73] hover:bg-[#152e57] text-white shadow-xs transition-all cursor-pointer font-medium"
+            className="h-8 px-4 bg-[#337ab7] hover:bg-[#286090] text-white text-xs font-medium rounded flex items-center gap-1.5 transition-colors cursor-pointer self-end ml-auto"
           >
-            <Download className="h-3.5 w-3.5 mr-1.5" />
-            <span>ទាញយក CSV</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* ── 2. View Mode Tabs Switcher ── */}
-      <div className="flex items-center justify-between gap-3 bg-slate-100/80 p-2 rounded-2xl border border-slate-200/60">
-        <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200/80 shadow-2xs">
-          <button
-            type="button"
-            onClick={() => changeView("details")}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              activeView === "details"
-                ? "bg-[#1c3d73] text-white shadow-2xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            <ListFilter className="h-3.5 w-3.5" />
-            <span>Expense Details (លម្អិត)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => changeView("summary")}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              activeView === "summary"
-                ? "bg-[#1c3d73] text-white shadow-2xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            <BarChart3 className="h-3.5 w-3.5" />
-            <span>Expense Summary (សង្ខេប)</span>
+            <FileSpreadsheet className="h-3.5 w-3.5" />
+            <span>Export out</span>
           </button>
         </div>
       </div>
 
-      {/* ── 3. Filter Bar ── */}
-      <Card className="bg-white border-slate-200/80 shadow-xs rounded-2xl overflow-hidden">
-        <CardContent className="p-4 sm:p-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3.5 items-end">
-            {/* Date From */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5 text-[#1c3d73]" />
-                <span>ចាប់ពីថ្ងៃ (Date From)</span>
-              </label>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => {
-                  setStartDate(e.target.value);
-                  setDatePreset("all");
-                }}
-                className="bg-slate-50 hover:bg-slate-100/70 focus:bg-white border-slate-200 text-slate-800 text-xs h-9.5 rounded-xl focus-visible:ring-2 focus-visible:ring-[#1c3d73]/20 focus-visible:border-[#1c3d73] transition-all"
-              />
-            </div>
-
-            {/* Date To */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5 text-[#1c3d73]" />
-                <span>ដល់ថ្ងៃ (Date To)</span>
-              </label>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => {
-                  setEndDate(e.target.value);
-                  setDatePreset("all");
-                }}
-                className="bg-slate-50 hover:bg-slate-100/70 focus:bg-white border-slate-200 text-slate-800 text-xs h-9.5 rounded-xl focus-visible:ring-2 focus-visible:ring-[#1c3d73]/20 focus-visible:border-[#1c3d73] transition-all"
-              />
-            </div>
-
-            {/* Search Input */}
-            <div className="sm:col-span-2 space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                <Search className="h-3.5 w-3.5 text-[#1c3d73]" />
-                <span>ស្វែងរក (Search Note / Receiver)</span>
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="ស្វែងរកតាមចំណាយលើ, ព័ត៌មានលម្អិត..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border-slate-200 text-slate-800 text-xs h-9.5 rounded-xl focus-visible:ring-2 focus-visible:ring-[#1c3d73]/20 focus-visible:border-[#1c3d73] transition-all"
-                />
-              </div>
-            </div>
-
-            {/* Date Preset Buttons */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-500 block">ជម្រើសកាលបរិច្ឆេទ</label>
-              <div className="flex gap-1.5 items-center">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePresetDate("all")}
-                  className={`h-9.5 text-xs px-3 rounded-xl border-slate-200 transition-all cursor-pointer font-semibold ${
-                    datePreset === "all" && !startDate && !endDate
-                      ? "bg-[#1c3d73] text-white border-transparent"
-                      : "bg-white text-slate-700 hover:bg-slate-100"
-                  }`}
-                >
-                  All
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePresetDate("this_month")}
-                  className={`h-9.5 text-xs px-3 rounded-xl border-slate-200 transition-all cursor-pointer font-semibold ${
-                    datePreset === "this_month"
-                      ? "bg-[#1c3d73] text-white border-transparent"
-                      : "bg-white text-slate-700 hover:bg-slate-100"
-                  }`}
-                >
-                  Month
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePresetDate("today")}
-                  className={`h-9.5 text-xs px-3 rounded-xl border-slate-200 transition-all cursor-pointer font-semibold ${
-                    datePreset === "today"
-                      ? "bg-[#1c3d73] text-white border-transparent"
-                      : "bg-white text-slate-700 hover:bg-slate-100"
-                  }`}
-                >
-                  Today
-                </Button>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── 4. KPI Summary Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-        <Card className="bg-white border-slate-200/80 shadow-xs hover:shadow-sm transition-all rounded-2xl overflow-hidden relative">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-[#1c3d73]" />
-          <CardHeader className="p-4 pb-1">
-            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              ចំនួនប្រតិបត្តិការចំណាយ (Expense Records)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-1">
-            <div className="text-2xl font-bold font-mono text-slate-900">
-              {filteredExpenses.length} <span className="text-xs font-sans font-medium text-slate-500">ប្រតិបត្តិការ</span>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-1">ចំនួនកំណត់ត្រាចំណាយប្រតិបត្តិការសរុប</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border-slate-200/80 shadow-xs hover:shadow-sm transition-all rounded-2xl overflow-hidden relative">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-rose-500" />
-          <CardHeader className="p-4 pb-1">
-            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              ទឹកប្រាក់ចំណាយសរុប (Total Expenses)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-1">
-            <div className="text-2xl font-bold font-mono text-rose-600">
-              ${totalExpenseAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <p className="text-[11px] text-slate-500 mt-1">ទឹកប្រាក់ចំណាយសរុបទាំងអស់ក្នុងចន្លោះពេលនេះ</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ── 5. Content View: DETAILS vs SUMMARY ── */}
-      {activeView === "summary" ? (
-        <div className="space-y-5">
-          {/* Monthly Breakdown Table */}
-          <Card className="bg-white border-slate-200/80 shadow-xs rounded-2xl overflow-hidden">
-            <CardHeader className="p-4.5 bg-slate-50/70 border-b border-slate-200/80">
-              <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-[#1c3d73]" />
-                <span>សង្ខេបតាមខែ (Monthly Expense Summary)</span>
-              </CardTitle>
-            </CardHeader>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs whitespace-nowrap">
-                <thead className="bg-[#0f172a] text-white uppercase text-[11px] font-semibold tracking-wider">
-                  <tr>
-                    <th className="px-4 py-3">ខែ (Month)</th>
-                    <th className="px-4 py-3 text-center">ចំនួនប្រតិបត្តិការ (Records)</th>
-                    <th className="px-4 py-3 text-right">ទឹកប្រាក់សរុប (Total Amount)</th>
-                    <th className="px-4 py-3 text-right">មធ្យម/ប្រតិបត្តិការ (Average/Record)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {monthlySummary.map((m) => (
-                    <tr key={m.month} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-4 py-3 font-bold text-[#1c3d73]">{m.month}</td>
-                      <td className="px-4 py-3 text-center font-mono font-bold text-slate-800">{m.count}</td>
-                      <td className="px-4 py-3 text-right font-mono font-bold tabular-nums text-rose-600">
-                        ${m.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono tabular-nums text-slate-700">
-                        ${(m.count > 0 ? m.total / m.count : 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                    </tr>
-                  ))}
-                  {monthlySummary.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="px-4 py-10 text-center text-slate-400">
-                        មិនមានទិន្នន័យសង្ខេបចំណាយឡើយ
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-
-          {/* Receiver / Category Summary Table */}
-          <Card className="bg-white border-slate-200/80 shadow-xs rounded-2xl overflow-hidden">
-            <CardHeader className="p-4.5 bg-slate-50/70 border-b border-slate-200/80">
-              <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-[#1c3d73]" />
-                <span>សង្ខេបតាមអ្នកទទួល / គោលបំណង (Receiver Summary)</span>
-              </CardTitle>
-            </CardHeader>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs whitespace-nowrap">
-                <thead className="bg-[#0f172a] text-white uppercase text-[11px] font-semibold tracking-wider">
-                  <tr>
-                    <th className="px-4 py-3">អ្នកទទួល / ចំណាយលើ (Expense To)</th>
-                    <th className="px-4 py-3 text-center">ចំនួនដង (Records)</th>
-                    <th className="px-4 py-3 text-right">ទឹកប្រាក់សរុប (Total Amount)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {receiverSummary.map((r, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-4 py-3 font-semibold text-slate-900">{r.receiver}</td>
-                      <td className="px-4 py-3 text-center font-mono font-bold text-slate-800">{r.count}</td>
-                      <td className="px-4 py-3 text-right font-mono font-bold tabular-nums text-rose-600">
-                        ${r.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                    </tr>
-                  ))}
-                  {receiverSummary.length === 0 && (
-                    <tr>
-                      <td colSpan={3} className="px-4 py-10 text-center text-slate-400">
-                        មិនមានទិន្នន័យឡើយ
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        </div>
-      ) : (
-        /* Details View */
-        <Card className="bg-white border-slate-200/80 shadow-xs rounded-2xl overflow-hidden">
+      {/* ── 3. Table Presentation (Exact match) ── */}
+      {isSummary ? (
+        /* ================= EXPENSE SUMMARY VIEW (Screenshot 4) ================= */
+        <div className="border border-[#1f385c] rounded overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs whitespace-nowrap">
-              <thead className="bg-[#0f172a] text-white uppercase text-[11px] font-semibold tracking-wider">
-                <tr>
-                  <th className="px-4 py-3.5 w-12">#No</th>
-                  <th className="px-4 py-3.5">កាលបរិច្ឆេទ (Date)</th>
-                  <th className="px-4 py-3.5">ចំណាយលើ (Expense To)</th>
-                  <th className="px-4 py-3.5 text-right">ទឹកប្រាក់ (Amount)</th>
-                  <th className="px-4 py-3.5">ព័ត៌មានលម្អិត / សម្គាល់ (Details / Note)</th>
+            <table className="w-full text-xs text-left border-collapse">
+              <thead>
+                <tr className="bg-[#1f385c] text-white uppercase text-[11px] tracking-wider font-semibold">
+                  <th className="py-2.5 px-3 border-r border-[#2d4d77]">Expense Type</th>
+                  <th className="py-2.5 px-3 border-r border-[#2d4d77] text-center">Expense Count</th>
+                  <th className="py-2.5 px-3 text-right">Expense Amount</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {paginatedExpenses.map((item, index) => (
-                  <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-4 py-3.5 font-bold text-slate-400">
-                      {(currentPage - 1) * pageSize + index + 1}
-                    </td>
-                    <td className="px-4 py-3.5 font-mono text-slate-600">
-                      {item.expenseDate ? item.expenseDate.slice(0, 10) : "-"}
-                    </td>
-                    <td className="px-4 py-3.5 font-semibold text-[#1c3d73]">{item.expenseTo}</td>
-                    <td className="px-4 py-3.5 text-right font-mono font-bold tabular-nums text-rose-600">
-                      ${Number(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-4 py-3.5 text-slate-600 max-w-md truncate">
-                      {item.details || "-"}
-                    </td>
-                  </tr>
-                ))}
-                {filteredExpenses.length === 0 && !loading && (
+              <tbody className="divide-y divide-slate-200">
+                {loading ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center text-slate-400">
-                      <FileText className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                      <p className="text-sm font-medium">មិនមានទិន្នន័យចំណាយឡើយ (No expense records found)</p>
+                    <td colSpan={3} className="py-8 text-center text-slate-500">
+                      Loading expense summary...
                     </td>
                   </tr>
+                ) : summaryRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-slate-400">
+                      No expense data found
+                    </td>
+                  </tr>
+                ) : (
+                  summaryRows.map((row, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-2 px-3 border-r border-slate-200 font-medium text-slate-800">
+                        {row.type}
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-200 text-center text-slate-700">
+                        {row.count}
+                      </td>
+                      <td className="py-2 px-3 text-right font-medium text-slate-800">
+                        {formatMoney(row.amount)}
+                      </td>
+                    </tr>
+                  ))
                 )}
+
+                {/* Yellow Total Summary Row (Exact Screenshot 4) */}
+                <tr className="bg-[#fff8db] border-t-2 border-[#f1e4b3] font-bold text-slate-800">
+                  <td className="py-2 px-3 text-right pr-4">Total :</td>
+                  <td className="py-2 px-3 text-center">{filteredExpenses.length}</td>
+                  <td className="py-2 px-3 text-right">{formatMoney(totalAmount)}</td>
+                </tr>
               </tbody>
             </table>
           </div>
+        </div>
+      ) : (
+        /* ================= EXPENSE DETAILS VIEW (Screenshot 3) ================= */
+        <div className="border border-[#1f385c] rounded overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left border-collapse">
+              <thead>
+                <tr className="bg-[#1f385c] text-white uppercase text-[11px] tracking-wider font-semibold">
+                  <th className="py-2.5 px-3 border-r border-[#2d4d77]">Expense Type</th>
+                  <th className="py-2.5 px-3 border-r border-[#2d4d77]">Reference</th>
+                  <th className="py-2.5 px-3 border-r border-[#2d4d77]">Date</th>
+                  <th className="py-2.5 px-3 border-r border-[#2d4d77] text-right">Amount</th>
+                  <th className="py-2.5 px-3 border-r border-[#2d4d77]">Note</th>
+                  <th className="py-2.5 px-3">By</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-500">
+                      Loading expense details...
+                    </td>
+                  </tr>
+                ) : filteredExpenses.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-400">
+                      No expense records found
+                    </td>
+                  </tr>
+                ) : (
+                  filteredExpenses.map((exp, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-2 px-3 border-r border-slate-200 font-medium text-slate-800">
+                        {exp.expenseTo || "OTHER"}
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-200 text-slate-600 font-mono text-[11px]">
+                        {exp.id.slice(0, 8).toUpperCase()}
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-200 text-slate-700 whitespace-nowrap">
+                        {exp.expenseDate
+                          ? exp.expenseDate.slice(0, 10)
+                          : exp.createdAt
+                          ? exp.createdAt.slice(0, 10)
+                          : "—"}
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-200 text-right font-medium text-slate-800">
+                        {formatMoney(exp.amount)}
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-200 text-slate-600 max-w-[240px] truncate">
+                        {exp.details || "—"}
+                      </td>
+                      <td className="py-2 px-3 text-slate-600">admin</td>
+                    </tr>
+                  ))
+                )}
 
-          {filteredExpenses.length > 0 && (
-            <TablePagination
-              currentPage={currentPage}
-              pageSize={pageSize}
-              totalItems={filteredExpenses.length}
-              onPageChange={setCurrentPage}
-            />
-          )}
-        </Card>
+                {/* Yellow Total Summary Row (Exact Screenshot 3: Total : $0.00) */}
+                <tr className="bg-[#fff8db] border-t-2 border-[#f1e4b3] font-bold text-slate-800">
+                  <td colSpan={3} className="py-2 px-3 text-right pr-4">
+                    Total :
+                  </td>
+                  <td className="py-2 px-3 text-right">{formatMoney(totalAmount)}</td>
+                  <td colSpan={2}></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
     </div>
   );

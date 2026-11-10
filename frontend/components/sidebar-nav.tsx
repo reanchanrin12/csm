@@ -186,8 +186,8 @@ const csmNavSections: NavSection[] = [
         icon: FileText,
         roles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "ACCOUNTANT"],
         subItems: [
-          { name: "Stock List", href: "/inventory" },
-          { name: "Purchased Report", href: "/reports/inventory" },
+          { name: "Stock List", href: "/reports/inventory?view=stock" },
+          { name: "Purchased Report", href: "/reports/inventory?view=purchased" },
         ],
       },
       {
