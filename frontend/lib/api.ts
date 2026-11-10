@@ -193,6 +193,7 @@ export interface LoanScheduleItem {
   dueDate: string;
   principal: number;
   interest: number;
+  penalty?: number;
   totalDue: number;
   paidAmount: number;
   status: "PENDING" | "PARTIAL" | "PAID" | "OVERDUE";

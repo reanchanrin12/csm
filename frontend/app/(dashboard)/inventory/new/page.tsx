@@ -698,10 +698,11 @@ function CarPurchasingForm() {
                     >
                       <option value="">-- Select Supplier --</option>
                       {options.suppliers.map((s) => {
-                        const nameText =
-                          s.nameKh && s.nameKh !== s.nameEn
-                            ? `${s.nameKh} (${s.nameEn})`
-                            : s.nameEn || s.nameKh || "";
+                        const nameText = s.nameEn
+                          ? s.nameKh && s.nameKh !== s.nameEn
+                            ? `${s.nameEn} (${s.nameKh})`
+                            : s.nameEn
+                          : s.nameKh || "";
                         const categoryTag =
                           s.category && s.category !== "VEHICLE"
                             ? ` [${s.category}]`
