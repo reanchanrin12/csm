@@ -18,6 +18,20 @@ export interface CreateBillDto {
   }[];
 }
 
+export interface UpdateBillDto {
+  supplierId?: string;
+  paidAmount?: number;
+  billDate?: string;
+  description?: string;
+  totalAmount?: number;
+  allocations?: Array<{
+    vin: string;
+    costType?: CostCategory;
+    amount: number;
+    note?: string;
+  }>;
+}
+
 @Injectable()
 export class CostsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -202,24 +216,64 @@ export class CostsService {
   }
 
   // 2.1 Update bill
-  async updateBill(
-    id: string,
-    dto: {
-      supplierId?: string;
-      paidAmount?: number;
-      billDate?: string;
-      description?: string;
-    },
-  ) {
-    const data: any = {};
-    if (dto.supplierId) data.supplierId = dto.supplierId;
-    if (dto.paidAmount !== undefined) data.paidAmount = dto.paidAmount;
-    if (dto.billDate) data.billDate = new Date(dto.billDate);
-    if (dto.description !== undefined) data.description = dto.description;
+  async updateBill(id: string, dto: UpdateBillDto) {
+    return this.prisma.$transaction(async (tx) => {
+      const bill = await tx.landedCostBill.findUnique({
+        where: { id },
+        include: { costItems: true },
+      });
+      if (!bill) throw new NotFoundException('Bill not found');
 
-    return this.prisma.landedCostBill.update({
-      where: { id },
-      data,
+      let newTotal = dto.totalAmount !== undefined ? dto.totalAmount : Number(bill.totalAmount);
+
+      if (dto.allocations && dto.allocations.length > 0) {
+        const vins = Array.from(new Set(dto.allocations.map((a) => a.vin)));
+        const vehicles = await tx.vehicle.findMany({
+          where: { vin: { in: vins } },
+          select: { id: true, vin: true },
+        });
+        const vinMap = new Map(vehicles.map((v) => [v.vin, v.id]));
+
+        // Remove old cost items for this bill
+        await tx.vehicleCostItem.deleteMany({ where: { billId: id } });
+
+        // Re-create updated cost items
+        let sum = 0;
+        for (const alloc of dto.allocations) {
+          const vId = vinMap.get(alloc.vin);
+          if (vId) {
+            sum += Number(alloc.amount) || 0;
+            await tx.vehicleCostItem.create({
+              data: {
+                vehicleId: vId,
+                costType: alloc.costType || bill.category,
+                amount: alloc.amount,
+                billId: id,
+                note: alloc.note,
+              },
+            });
+          }
+        }
+        if (dto.totalAmount === undefined) {
+          newTotal = sum;
+        }
+      }
+
+      const data: any = {};
+      if (dto.supplierId) data.supplierId = dto.supplierId;
+      if (dto.paidAmount !== undefined) data.paidAmount = dto.paidAmount;
+      if (dto.billDate) data.billDate = new Date(dto.billDate);
+      if (dto.description !== undefined) data.description = dto.description;
+      data.totalAmount = newTotal;
+
+      return tx.landedCostBill.update({
+        where: { id },
+        data,
+        include: {
+          supplier: true,
+          costItems: { include: { vehicle: true } },
+        },
+      });
     });
   }
 

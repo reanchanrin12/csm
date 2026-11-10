@@ -641,6 +641,20 @@ function LogisticsContent() {
     }
   };
 
+  interface BillVehicleRow {
+    vin: string;
+    brand: string;
+    model: string;
+    year: number | string;
+    color: string;
+    clearance: number;
+    taxPayment: number;
+    lineTotal: number;
+    isEditing?: boolean;
+  }
+
+  const [editCarRows, setEditCarRows] = useState<BillVehicleRow[]>([]);
+
   // ── Open & Edit Bill Details Modal (Exact Reference Screenshot 1) ────
   const handleOpenBillDetails = (b: BillItem) => {
     setSelectedBill(b);
@@ -652,67 +666,20 @@ function LogisticsContent() {
     setEditPaidAmount(b.paidAmount);
     setEditDescription(b.description || b.billNumber || "");
     setBillSaveError(null);
-  };
 
-  const handleSaveBillChanges = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedBill) return;
-    setBillSaving(true);
-    setBillSaveError(null);
-    try {
-      await costService.updateBill(selectedBill.id, {
-        supplierId: editTransportCompanyId || undefined,
-        billDate: editShippingDate || undefined,
-        paidAmount: typeof editPaidAmount === "number" ? editPaidAmount : 0,
-        description: editDescription || undefined,
-      });
-      setActionSuccess(`Bill "${selectedBill.billNumber}" updated successfully.`);
-      setSelectedBill(null);
-      await fetchData();
-    } catch (err: unknown) {
-      setBillSaveError(err instanceof Error ? err.message : "Failed to save bill changes.");
-    } finally {
-      setBillSaving(false);
-    }
-  };
-
-  const editBalance = useMemo(() => {
-    if (!selectedBill) return 0;
-    const paid = typeof editPaidAmount === "number" ? editPaidAmount : 0;
-    return Math.max(0, selectedBill.totalAmount - paid);
-  }, [selectedBill, editPaidAmount]);
-
-  const billVehicleRows = useMemo(() => {
-    if (!selectedBill) return [];
-    const map = new Map<
-      string,
-      {
-        vin: string;
-        brand: string;
-        model: string;
-        year: number | string;
-        color: string;
-        clearance: number;
-        taxPayment: number;
-        lineTotal: number;
-      }
-    >();
-
-    for (const v of selectedBill.vehicles) {
+    const map = new Map<string, BillVehicleRow>();
+    for (const v of b.vehicles) {
       const existing = map.get(v.vin);
-      const isClearance = v.costType === "CLEARANCE" || selectedBill.category === "CLEARANCE";
-      const isTax = v.costType === "TAX" || selectedBill.category === "TAX";
-
       const cAmt =
         v.costType === "CLEARANCE"
           ? v.allocatedAmount
-          : !v.costType && selectedBill.category === "CLEARANCE"
+          : !v.costType && b.category === "CLEARANCE"
           ? v.allocatedAmount
           : 0;
       const tAmt =
         v.costType === "TAX"
           ? v.allocatedAmount
-          : !v.costType && selectedBill.category === "TAX"
+          : !v.costType && b.category === "TAX"
           ? v.allocatedAmount
           : 0;
 
@@ -738,13 +705,97 @@ function LogisticsContent() {
           color: v.color || "SILVER",
           clearance: cAmt,
           taxPayment: tAmt,
-          lineTotal: v.allocatedAmount,
+          lineTotal: cAmt + tAmt || v.allocatedAmount,
+          isEditing: false,
         });
       }
     }
+    setEditCarRows(Array.from(map.values()));
+  };
 
-    return Array.from(map.values());
-  }, [selectedBill]);
+  const handleUpdateCarRow = (index: number, field: "clearance" | "taxPayment", val: number) => {
+    setEditCarRows((prev) => {
+      const updated = [...prev];
+      const item = { ...updated[index] } as BillVehicleRow;
+      if (field === "clearance") item.clearance = Math.max(0, val);
+      if (field === "taxPayment") item.taxPayment = Math.max(0, val);
+      item.lineTotal = (item.clearance || 0) + (item.taxPayment || 0);
+      updated[index] = item;
+      return updated;
+    });
+  };
+
+  const handleToggleCarEdit = (index: number) => {
+    setEditCarRows((prev) => {
+      const updated = [...prev];
+      const item = { ...updated[index] } as BillVehicleRow;
+      item.isEditing = !item.isEditing;
+      updated[index] = item;
+      return updated;
+    });
+  };
+
+  const handleRemoveCarRow = (index: number) => {
+    setEditCarRows((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const editTotalAmount = useMemo(() => {
+    return editCarRows.reduce((acc, row) => acc + (Number(row.lineTotal) || 0), 0);
+  }, [editCarRows]);
+
+  const editBalance = useMemo(() => {
+    const paid = typeof editPaidAmount === "number" ? editPaidAmount : 0;
+    return Math.max(0, editTotalAmount - paid);
+  }, [editTotalAmount, editPaidAmount]);
+
+  const handleSaveBillChanges = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBill) return;
+    setBillSaving(true);
+    setBillSaveError(null);
+    try {
+      const allocations: Array<{ vin: string; costType?: any; amount: number; note?: string }> = [];
+      for (const row of editCarRows) {
+        if (row.clearance > 0) {
+          allocations.push({
+            vin: row.vin,
+            costType: "CLEARANCE",
+            amount: row.clearance,
+          });
+        }
+        if (row.taxPayment > 0) {
+          allocations.push({
+            vin: row.vin,
+            costType: "TAX",
+            amount: row.taxPayment,
+          });
+        }
+        if (row.clearance === 0 && row.taxPayment === 0 && row.lineTotal > 0) {
+          allocations.push({
+            vin: row.vin,
+            costType: selectedBill.category,
+            amount: row.lineTotal,
+          });
+        }
+      }
+
+      await costService.updateBill(selectedBill.id, {
+        supplierId: editTransportCompanyId || undefined,
+        billDate: editShippingDate || undefined,
+        paidAmount: typeof editPaidAmount === "number" ? editPaidAmount : 0,
+        description: editDescription || undefined,
+        totalAmount: editTotalAmount,
+        allocations: allocations.length > 0 ? allocations : undefined,
+      });
+      setActionSuccess(`Bill "${selectedBill.billNumber}" updated successfully.`);
+      setSelectedBill(null);
+      await fetchData();
+    } catch (err: unknown) {
+      setBillSaveError(err instanceof Error ? err.message : "Failed to save bill changes.");
+    } finally {
+      setBillSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-4 max-w-full pb-16">
@@ -1889,32 +1940,17 @@ function LogisticsContent() {
                 />
               </div>
 
-              {/* Buttons: Close & Save changes */}
-              <div className="flex items-center justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setSelectedBill(null)}
-                  className="h-[30px] px-4 border border-[#dcdfe6] text-slate-700 hover:bg-slate-50 rounded-[2px] text-xs font-medium cursor-pointer"
-                >
-                  Close
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveBillChanges}
-                  disabled={billSaving}
-                  className="h-[30px] px-4 bg-[#1976d2] hover:bg-[#1565c0] text-white rounded-[2px] text-xs font-semibold cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-2xs"
-                >
-                  <Save className="h-3.5 w-3.5" />
-                  <span>{billSaving ? "Saving..." : "Save changes"}</span>
-                </button>
-              </div>
-
               {/* Section: Car list with Total on Right */}
               <div className="space-y-2 pt-2 border-t border-slate-200">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-[13px] font-bold text-[#2c3e50]">Car list</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-[13px] font-bold text-[#2c3e50]">Car list</h3>
+                    <span className="text-[11px] text-slate-500">
+                      ({editCarRows.length} vehicle{editCarRows.length === 1 ? "" : "s"})
+                    </span>
+                  </div>
                   <span className="text-[13px] font-bold text-slate-900">
-                    Total: ${selectedBill.totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    Total: ${editTotalAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                   </span>
                 </div>
 
@@ -1928,21 +1964,21 @@ function LogisticsContent() {
                         <th className="py-2 px-2.5 font-mono">Vin</th>
                         <th className="py-2 px-2.5 w-16">Year</th>
                         <th className="py-2 px-2.5 w-20">Color</th>
-                        <th className="py-2 px-2.5 w-24">Clearan</th>
-                        <th className="py-2 px-2.5 w-24">Tax Payment</th>
+                        <th className="py-2 px-2.5 w-28">Clearan</th>
+                        <th className="py-2 px-2.5 w-28">Tax Payment</th>
                         <th className="py-2 px-2.5 w-24">Line Total</th>
-                        <th className="py-2 px-2.5 w-14 text-center">Action</th>
+                        <th className="py-2 px-2.5 w-20 text-center">Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {billVehicleRows.length === 0 ? (
+                      {editCarRows.length === 0 ? (
                         <tr>
                           <td colSpan={10} className="py-6 text-center text-slate-400 italic">
                             No vehicles listed on this bill.
                           </td>
                         </tr>
                       ) : (
-                        billVehicleRows.map((v, i) => (
+                        editCarRows.map((v, i) => (
                           <tr key={v.vin + i} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                             <td className="py-2 px-2.5 text-slate-500 font-mono">{i + 1}</td>
                             <td className="py-2 px-2.5 font-semibold text-slate-800">{v.brand}</td>
@@ -1951,22 +1987,68 @@ function LogisticsContent() {
                             <td className="py-2 px-2.5 font-mono text-slate-600">{v.year}</td>
                             <td className="py-2 px-2.5 text-slate-600 uppercase">{v.color}</td>
                             <td className="py-2 px-2.5 font-mono text-slate-800">
-                              ${v.clearance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                              {v.isEditing ? (
+                                <div className="relative">
+                                  <span className="absolute left-1.5 top-1 text-slate-400 text-[10px]">$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={v.clearance}
+                                    onChange={(e) =>
+                                      handleUpdateCarRow(i, "clearance", parseFloat(e.target.value) || 0)
+                                    }
+                                    className="w-24 h-[24px] pl-4 pr-1 text-[11px] font-mono border border-[#409eff] rounded-[2px] bg-white text-slate-800 focus:outline-none"
+                                  />
+                                </div>
+                              ) : (
+                                `$${v.clearance.toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+                              )}
                             </td>
                             <td className="py-2 px-2.5 font-mono text-slate-800">
-                              ${v.taxPayment.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                              {v.isEditing ? (
+                                <div className="relative">
+                                  <span className="absolute left-1.5 top-1 text-slate-400 text-[10px]">$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={v.taxPayment}
+                                    onChange={(e) =>
+                                      handleUpdateCarRow(i, "taxPayment", parseFloat(e.target.value) || 0)
+                                    }
+                                    className="w-24 h-[24px] pl-4 pr-1 text-[11px] font-mono border border-[#409eff] rounded-[2px] bg-white text-slate-800 focus:outline-none"
+                                  />
+                                </div>
+                              ) : (
+                                `$${v.taxPayment.toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+                              )}
                             </td>
                             <td className="py-2 px-2.5 font-mono font-bold text-slate-900">
                               ${v.lineTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                             </td>
                             <td className="py-2 px-2.5 text-center">
-                              <button
-                                type="button"
-                                className="h-5 w-5 rounded bg-[#1976d2] hover:bg-[#1565c0] text-white inline-flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
-                                title="Edit item"
-                              >
-                                <Edit2 className="h-3 w-3" />
-                              </button>
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleCarEdit(i)}
+                                  className={cn(
+                                    "h-6 w-6 rounded inline-flex items-center justify-center cursor-pointer transition-colors shadow-2xs",
+                                    v.isEditing
+                                      ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                                      : "bg-[#1976d2] hover:bg-[#1565c0] text-white"
+                                  )}
+                                  title={v.isEditing ? "Done editing" : "Edit clearance / tax fees"}
+                                >
+                                  {v.isEditing ? <Check className="h-3 w-3" /> : <Edit2 className="h-3 w-3" />}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveCarRow(i)}
+                                  className="h-6 w-6 rounded bg-rose-600 hover:bg-rose-700 text-white inline-flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                  title="Remove car from this bill"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))
@@ -1974,6 +2056,26 @@ function LogisticsContent() {
                     </tbody>
                   </table>
                 </div>
+              </div>
+
+              {/* Modal Footer: Close & Save changes */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setSelectedBill(null)}
+                  className="h-[32px] px-4 border border-[#dcdfe6] text-slate-700 hover:bg-slate-50 rounded-[2px] text-xs font-medium cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveBillChanges}
+                  disabled={billSaving}
+                  className="h-[32px] px-5 bg-[#1976d2] hover:bg-[#1565c0] text-white rounded-[2px] text-xs font-semibold cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-2xs"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  <span>{billSaving ? "Saving..." : "Save changes"}</span>
+                </button>
               </div>
             </div>
           )}

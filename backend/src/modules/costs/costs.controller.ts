@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
-import { CostsService, CreateBillDto } from './costs.service';
+import { CostsService, CreateBillDto, UpdateBillDto } from './costs.service';
 import type { CostCategory } from '@csm/contracts';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -21,13 +21,7 @@ export class CostsController {
   @Patch('bills/:id')
   updateBill(
     @Param('id') id: string,
-    @Body()
-    dto: {
-      supplierId?: string;
-      paidAmount?: number;
-      billDate?: string;
-      description?: string;
-    },
+    @Body() dto: UpdateBillDto,
   ) {
     return this.costsService.updateBill(id, dto);
   }
