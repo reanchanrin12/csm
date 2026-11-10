@@ -164,21 +164,30 @@ const csmNavSections: NavSection[] = [
     title: "REPORTS",
     items: [
       {
-        name: "Car Sales Reports",
-        icon: Car,
+        name: "Sales Reports",
+        icon: FileText,
         roles: ["SUPER_ADMIN", "ADMIN", "SALE", "ACCOUNTANT"],
         subItems: [
-          { name: "Sale details", href: "/reports/sales?type=car&view=details" },
-          { name: "Sale summary", href: "/reports/sales?type=car&view=summary" },
+          { name: "Sale Details", href: "/reports/sales?view=details" },
+          { name: "Sale Summary", href: "/reports/sales?view=summary" },
         ],
       },
       {
-        name: "Tuk Tuk Reports",
-        icon: Truck,
-        roles: ["SUPER_ADMIN", "ADMIN", "SALE", "ACCOUNTANT"],
+        name: "Expense Reports",
+        icon: FileText,
+        roles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"],
         subItems: [
-          { name: "Sale details", href: "/reports/sales?type=tuktuk&view=details" },
-          { name: "Sale summary", href: "/reports/sales?type=tuktuk&view=summary" },
+          { name: "Expense Details", href: "/reports/expenses?view=details" },
+          { name: "Expense Summary", href: "/reports/expenses?view=summary" },
+        ],
+      },
+      {
+        name: "Stock / Purchased Reports",
+        icon: FileText,
+        roles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "ACCOUNTANT"],
+        subItems: [
+          { name: "Stock List", href: "/inventory" },
+          { name: "Purchased Report", href: "/reports/inventory" },
         ],
       },
       {
@@ -192,14 +201,8 @@ const csmNavSections: NavSection[] = [
           { name: "Shipping", href: "/reports/logistics" },
           { name: "Tax & Clearance", href: "/reports/logistics?tab=tax" },
           { name: "Repair", href: "/reports/repairs" },
-          { name: "Other expenses", href: "/reports/expenses" },
+          { name: "Other expenses", href: "/finance?tab=expenses" },
         ],
-      },
-      {
-        name: "Stock / Purchased",
-        href: "/reports/inventory",
-        icon: Package,
-        roles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "ACCOUNTANT"],
       },
     ],
   },
