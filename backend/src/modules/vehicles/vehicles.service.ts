@@ -286,6 +286,7 @@ export class VehiclesService {
         repairCost,
         totalLandedCost,
         inSalePrice: v.inSalePrice ? Number(v.inSalePrice) : null,
+        purchasingDate: v.purchasingDate ? v.purchasingDate.toISOString() : null,
         createdAt: v.createdAt.toISOString(),
       };
     });

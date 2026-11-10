@@ -114,6 +114,7 @@ export const VehicleSummarySchema = z.object({
   repairCost: z.number().optional().default(0),
   totalLandedCost: z.number(),
   inSalePrice: z.number().nullable().optional(),
+  purchasingDate: z.string().nullable().optional(),
   createdAt: z.string(),
 });
 export type VehicleSummary = z.infer<typeof VehicleSummarySchema>;
