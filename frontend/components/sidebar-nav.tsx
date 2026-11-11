@@ -348,7 +348,7 @@ function SidebarNavContent({ onNavigate }: SidebarNavProps) {
                   onClick={() => toggleSection(section.title!)}
                   className="w-full flex items-center justify-between px-3 pt-3.5 pb-1.5 border-t border-[#162035] mt-2 group cursor-pointer text-left"
                 >
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-sky-400 transition-colors">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#409eff] transition-colors">
                     {section.title}
                   </p>
                   <ChevronDown
@@ -381,7 +381,7 @@ function SidebarNavContent({ onNavigate }: SidebarNavProps) {
                           type="button"
                           onClick={() => toggleItem(item.name)}
                           className={cn(
-                            "w-full flex items-center justify-between px-3 py-2 rounded-xl text-[13px] transition-all cursor-pointer",
+                            "w-full flex items-center justify-between px-3 py-2 rounded-lg text-[13px] transition-all cursor-pointer outline-none focus:outline-none focus-visible:outline-none",
                             hasActiveChild
                               ? "text-white bg-[#131d31] font-medium"
                               : "text-slate-300 hover:text-white hover:bg-slate-800/40"
@@ -391,7 +391,7 @@ function SidebarNavContent({ onNavigate }: SidebarNavProps) {
                             <Icon
                               className={cn(
                                 "h-4 w-4 shrink-0 transition-colors",
-                                hasActiveChild ? "text-sky-400" : "text-slate-400"
+                                hasActiveChild ? "text-[#409eff]" : "text-slate-400"
                               )}
                             />
                             <span className="truncate">{item.name}</span>
@@ -417,16 +417,16 @@ function SidebarNavContent({ onNavigate }: SidebarNavProps) {
                                   href={sub.href}
                                   onClick={() => onNavigate?.()}
                                   className={cn(
-                                    "flex items-center px-2.5 py-1.5 rounded-lg text-[12px] transition-all truncate",
+                                    "flex items-center px-2.5 py-1.5 rounded-lg text-[12px] transition-all truncate outline-none focus:outline-none focus-visible:outline-none",
                                     isSubActive
-                                      ? "bg-sky-500/15 text-sky-300 font-semibold shadow-xs"
+                                      ? "bg-[#1890ff]/20 text-[#409eff] font-semibold"
                                       : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
                                   )}
                                 >
                                   <span
                                     className={cn(
                                       "w-1.5 h-1.5 rounded-full mr-2.5 shrink-0 transition-all",
-                                      isSubActive ? "bg-sky-400 ring-2 ring-sky-400/30" : "bg-slate-600"
+                                      isSubActive ? "bg-[#409eff]" : "bg-slate-600"
                                     )}
                                   />
                                   <span className="truncate">{sub.name}</span>
@@ -448,16 +448,16 @@ function SidebarNavContent({ onNavigate }: SidebarNavProps) {
                       title={item.name}
                       onClick={() => onNavigate?.()}
                       className={cn(
-                        "relative flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] transition-all duration-150",
+                        "relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 outline-none focus:outline-none focus-visible:outline-none",
                         isActive
-                          ? "bg-gradient-to-r from-sky-500/15 via-blue-600/10 to-transparent text-sky-400 font-semibold border-l-[3px] border-sky-400 pl-[9px] shadow-[0_0_12px_rgba(56,189,248,0.08)]"
-                          : "border-l-[3px] border-transparent text-slate-300 hover:text-white hover:bg-slate-800/40"
+                          ? "bg-[#1890ff]/20 text-[#409eff] font-medium"
+                          : "text-slate-300 hover:text-white hover:bg-slate-800/40"
                       )}
                     >
                       <Icon
                         className={cn(
                           "h-4 w-4 shrink-0 transition-colors",
-                          isActive ? "text-sky-400" : "text-slate-400"
+                          isActive ? "text-[#409eff]" : "text-slate-400"
                         )}
                       />
                       <span className="truncate">{item.name}</span>
