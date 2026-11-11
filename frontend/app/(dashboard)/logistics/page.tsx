@@ -92,6 +92,9 @@ interface AddedCarItem {
   color: string;
   clearanceFee: number;
   taxPayment: number;
+  tranFee?: number;
+  containerFee?: number;
+  laborFee?: number;
   total: number;
 }
 
@@ -171,11 +174,21 @@ function LogisticsContent() {
 
   // Inline "choose car" addition row
   const [selectedCarVin, setSelectedCarVin] = useState("");
-  const [carSearchTerm, setCarSearchTerm] = useState("");
-  const [isCarDropdownOpen, setIsCarDropdownOpen] = useState(false);
-  const carDropdownRef = useRef<HTMLDivElement>(null);
   const [inputClearanceFee, setInputClearanceFee] = useState<number | "">("");
   const [inputTaxPayment, setInputTaxPayment] = useState<number | "">("");
+  const [inputTranFee, setInputTranFee] = useState<number | "">("");
+  const [inputContainerFee, setInputContainerFee] = useState<number | "">("");
+  const [inputLaborFee, setInputLaborFee] = useState<number | "">("");
+
+  // ── "Select car" Modal State (matching reference system) ───────────
+  const [isCarModalOpen, setIsCarModalOpen] = useState(false);
+  const [modalBrandFilter, setModalBrandFilter] = useState("");
+  const [modalModelFilter, setModalModelFilter] = useState("");
+  const [modalYearFilter, setModalYearFilter] = useState("");
+  const [modalVinFilter, setModalVinFilter] = useState("");
+  const [modalSelectedVin, setModalSelectedVin] = useState("");
+  const [modalCurrentPage, setModalCurrentPage] = useState(1);
+  const modalPageSize = 10;
 
   // Added cars table
   const [addedCars, setAddedCars] = useState<AddedCarItem[]>([]);
@@ -184,50 +197,60 @@ function LogisticsContent() {
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Close car dropdown on click outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (carDropdownRef.current && !carDropdownRef.current.contains(e.target as Node)) {
-        setIsCarDropdownOpen(false);
+  const selectedCarObj = useMemo(() => {
+    return vehicles.find((v) => v.vin === selectedCarVin);
+  }, [vehicles, selectedCarVin]);
+
+  const modalFilteredVehicles = useMemo(() => {
+    return vehicles.filter((v) => {
+      if (
+        modalBrandFilter.trim() &&
+        !v.brand?.toLowerCase().includes(modalBrandFilter.trim().toLowerCase())
+      ) {
+        return false;
       }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const filteredCarOptions = useMemo(() => {
-    if (!carSearchTerm.trim()) return vehicles;
-    const q = carSearchTerm.toLowerCase().trim();
-    return vehicles.filter(
-      (v) =>
-        v.vin.toLowerCase().includes(q) ||
-        (v.brand && v.brand.toLowerCase().includes(q)) ||
-        (v.model && v.model.toLowerCase().includes(q)) ||
-        (v.color && v.color.toLowerCase().includes(q))
-    );
-  }, [vehicles, carSearchTerm]);
-
-  useEffect(() => {
-    if (!selectedCarVin) {
-      setCarSearchTerm("");
-    } else {
-      const v = vehicles.find((x) => x.vin === selectedCarVin);
-      if (v) {
-        setCarSearchTerm(`${v.brand} ${v.model} (${v.vin})`);
+      if (
+        modalModelFilter.trim() &&
+        !v.model?.toLowerCase().includes(modalModelFilter.trim().toLowerCase())
+      ) {
+        return false;
       }
-    }
-  }, [selectedCarVin, vehicles]);
+      if (modalYearFilter.trim()) {
+        const yStr = String(v.madeYear || "");
+        if (!yStr.includes(modalYearFilter.trim())) return false;
+      }
+      if (
+        modalVinFilter.trim() &&
+        !v.vin?.toLowerCase().includes(modalVinFilter.trim().toLowerCase())
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [vehicles, modalBrandFilter, modalModelFilter, modalYearFilter, modalVinFilter]);
 
-  const handleSelectCar = (v: VehicleOption) => {
-    setSelectedCarVin(v.vin);
-    setCarSearchTerm(`${v.brand} ${v.model} (${v.vin})`);
-    setIsCarDropdownOpen(false);
+  const modalTotalPages = Math.ceil(modalFilteredVehicles.length / modalPageSize) || 1;
+
+  const modalPaginatedVehicles = useMemo(() => {
+    const start = (modalCurrentPage - 1) * modalPageSize;
+    return modalFilteredVehicles.slice(start, start + modalPageSize);
+  }, [modalFilteredVehicles, modalCurrentPage]);
+
+  const handleOpenCarModal = () => {
+    setModalSelectedVin(selectedCarVin || "");
+    setModalBrandFilter("");
+    setModalModelFilter("");
+    setModalYearFilter("");
+    setModalVinFilter("");
+    setModalCurrentPage(1);
+    setIsCarModalOpen(true);
   };
 
-  const handleClearCarSelection = () => {
-    setSelectedCarVin("");
-    setCarSearchTerm("");
-    setIsCarDropdownOpen(true);
+  const handleConfirmCarSelection = () => {
+    if (modalSelectedVin) {
+      setSelectedCarVin(modalSelectedVin);
+      setIsCarModalOpen(false);
+    }
   };
 
   // ── "Adding new logistic company" Modal State (Screenshot 4) ───────────
@@ -439,36 +462,74 @@ function LogisticsContent() {
       return;
     }
 
-    const cFee = typeof inputClearanceFee === "number" ? inputClearanceFee : 0;
-    const tPayment = typeof inputTaxPayment === "number" ? inputTaxPayment : 0;
-    const totalRow = cFee + tPayment;
+    if (isShippingMode) {
+      const tran = typeof inputTranFee === "number" ? inputTranFee : 0;
+      const cont = typeof inputContainerFee === "number" ? inputContainerFee : 0;
+      const lab = typeof inputLaborFee === "number" ? inputLaborFee : 0;
+      const totalRow = tran + cont + lab;
 
-    if (totalRow <= 0) {
-      setFormError("Please enter at least clearance fee or tax payment for the selected car.");
-      return;
+      if (totalRow <= 0) {
+        setFormError("Please enter at least Transport fee, Container fee, or Labor fee.");
+        return;
+      }
+
+      const newItem: AddedCarItem = {
+        carId: matched.id,
+        vin: matched.vin,
+        brand: matched.brand || "VOYAH",
+        model: matched.model || "FREE",
+        year: matched.madeYear || new Date().getFullYear(),
+        color: matched.color || "Black",
+        clearanceFee: 0,
+        taxPayment: 0,
+        tranFee: tran,
+        containerFee: cont,
+        laborFee: lab,
+        total: totalRow,
+      };
+
+      setAddedCars((prev) => {
+        const next = [...prev, newItem];
+        const newTotal = next.reduce((s, c) => s + c.total, 0);
+        setPaidAmount(newTotal);
+        return next;
+      });
+      setSelectedCarVin("");
+      setInputTranFee("");
+      setInputContainerFee("");
+      setInputLaborFee("");
+    } else {
+      const cFee = typeof inputClearanceFee === "number" ? inputClearanceFee : 0;
+      const tPayment = typeof inputTaxPayment === "number" ? inputTaxPayment : 0;
+      const totalRow = cFee + tPayment;
+
+      if (totalRow <= 0) {
+        setFormError("Please enter at least clearance fee or tax payment for the selected car.");
+        return;
+      }
+
+      const newItem: AddedCarItem = {
+        carId: matched.id,
+        vin: matched.vin,
+        brand: matched.brand || "VOYAH",
+        model: matched.model || "FREE",
+        year: matched.madeYear || new Date().getFullYear(),
+        color: matched.color || "Black",
+        clearanceFee: cFee,
+        taxPayment: tPayment,
+        total: totalRow,
+      };
+
+      setAddedCars((prev) => {
+        const next = [...prev, newItem];
+        const newTotal = next.reduce((s, c) => s + c.total, 0);
+        setPaidAmount(newTotal);
+        return next;
+      });
+      setSelectedCarVin("");
+      setInputClearanceFee("");
+      setInputTaxPayment("");
     }
-
-    const newItem: AddedCarItem = {
-      carId: matched.id,
-      vin: matched.vin,
-      brand: matched.brand || "VOYAH",
-      model: matched.model || "FREE",
-      year: matched.madeYear || new Date().getFullYear(),
-      color: matched.color || "Black",
-      clearanceFee: cFee,
-      taxPayment: tPayment,
-      total: totalRow,
-    };
-
-    setAddedCars((prev) => {
-      const next = [...prev, newItem];
-      const newTotal = next.reduce((s, c) => s + c.total, 0);
-      setPaidAmount(newTotal);
-      return next;
-    });
-    setSelectedCarVin("");
-    setInputClearanceFee("");
-    setInputTaxPayment("");
   };
 
   const handleRemoveCarFromList = (vinToRemove: string) => {
@@ -538,38 +599,80 @@ function LogisticsContent() {
     setFormSubmitting(true);
     try {
       // Build allocations
-      const allocations: { vin: string; amount: number; costType?: "TAX" | "CLEARANCE"; note?: string }[] = [];
-      for (const car of finalCars) {
-        if (car.clearanceFee > 0) {
-          allocations.push({
-            vin: car.vin,
-            amount: car.clearanceFee,
-            costType: "CLEARANCE",
-            note: `Port clearance for ${car.brand} ${car.model} (${car.vin})`,
-          });
+      const allocations: { vin: string; amount: number; costType?: any; note?: string }[] = [];
+      if (isShippingMode) {
+        for (const car of finalCars) {
+          if ((car.tranFee || 0) > 0) {
+            allocations.push({
+              vin: car.vin,
+              amount: car.tranFee!,
+              costType: "TRANSPORT",
+              note: `Transport fee for ${car.brand} ${car.model} (${car.vin})`,
+            });
+          }
+          if ((car.containerFee || 0) > 0) {
+            allocations.push({
+              vin: car.vin,
+              amount: car.containerFee!,
+              costType: "CONTAINER",
+              note: `Container fee for ${car.brand} ${car.model} (${car.vin})`,
+            });
+          }
+          if ((car.laborFee || 0) > 0) {
+            allocations.push({
+              vin: car.vin,
+              amount: car.laborFee!,
+              costType: "LABOR",
+              note: `Labor fee for ${car.brand} ${car.model} (${car.vin})`,
+            });
+          }
         }
-        if (car.taxPayment > 0) {
-          allocations.push({
-            vin: car.vin,
-            amount: car.taxPayment,
-            costType: "TAX",
-            note: `Customs tax for ${car.brand} ${car.model} (${car.vin})`,
-          });
+
+        await costService.createBill({
+          billNumber: invoiceNumber.trim(),
+          supplierId: transportCompanyId,
+          category: "TRANSPORT",
+          totalAmount: calculatedTotal,
+          paidAmount: typeof paidAmount === "number" ? paidAmount : 0,
+          billDate: transportDate,
+          description: description.trim() || undefined,
+          allocations,
+        });
+
+        setActionSuccess(`Shipping fee bill "${invoiceNumber.trim()}" saved successfully.`);
+      } else {
+        for (const car of finalCars) {
+          if (car.clearanceFee > 0) {
+            allocations.push({
+              vin: car.vin,
+              amount: car.clearanceFee,
+              costType: "CLEARANCE",
+              note: `Port clearance for ${car.brand} ${car.model} (${car.vin})`,
+            });
+          }
+          if (car.taxPayment > 0) {
+            allocations.push({
+              vin: car.vin,
+              amount: car.taxPayment,
+              costType: "TAX",
+              note: `Customs tax for ${car.brand} ${car.model} (${car.vin})`,
+            });
+          }
         }
+
+        await costService.createBill({
+          billNumber: invoiceNumber.trim(),
+          supplierId: transportCompanyId,
+          category: "CLEARANCE",
+          totalAmount: calculatedTotal,
+          paidAmount: typeof paidAmount === "number" ? paidAmount : 0,
+          billDate: transportDate,
+          description: description.trim() || undefined,
+          allocations,
+        });
+
+        setActionSuccess(`Tax & Clearance fee bill "${invoiceNumber.trim()}" saved successfully.`);
       }
-
-      await costService.createBill({
-        billNumber: invoiceNumber.trim(),
-        supplierId: transportCompanyId,
-        category: "CLEARANCE",
-        totalAmount: calculatedTotal,
-        paidAmount: typeof paidAmount === "number" ? paidAmount : 0,
-        billDate: transportDate,
-        description: description.trim() || undefined,
-        allocations,
-      });
-
-      setActionSuccess(`Tax & Clearance fee bill "${invoiceNumber.trim()}" saved successfully.`);
       // Reset form
       setInvoiceNumber(generateInvoiceNumber());
       setSelectedCarVin("");
@@ -890,22 +993,14 @@ function LogisticsContent() {
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════
-          VIEW MODE 1: "Adding new tax & clearance fee" (Exact CSM UI)
+          VIEW MODE 1: "Add new shipping fee" / "Adding new tax & clearance fee" (Exact Reference)
          ═══════════════════════════════════════════════════════════════════ */}
       {viewMode === "add-clearance" ? (
         <div className="space-y-4">
-          {/* Breadcrumb matching exact Screenshot */}
-          <div className="flex items-center gap-1.5 text-[12px] text-slate-500">
-            <LayoutGrid className="h-3.5 w-3.5 text-blue-500" />
-            <span className="text-slate-600 font-medium">Dashboard</span>
-            <span className="text-slate-400">&gt;</span>
-            <span className="text-slate-600">Transport info</span>
-          </div>
-
           {/* Header with Title and Invoice Number on Right */}
           <div className="flex flex-wrap items-end justify-between gap-4 pt-1 pb-1">
             <h1 className="text-[20px] font-bold text-[#2c3e50] tracking-tight">
-              {isShippingMode ? "Adding new shipping fee" : "Adding new tax & clearance fee"}
+              {isShippingMode ? "Add new shipping fee" : "Adding new tax & clearance fee"}
             </h1>
 
             {/* Top Right: Invoice Number Input matching Screenshot */}
@@ -918,7 +1013,7 @@ function LogisticsContent() {
                 required
                 value={invoiceNumber}
                 onChange={(e) => setInvoiceNumber(e.target.value)}
-                placeholder="IN202611037873"
+                placeholder="IN392841533"
                 className="w-64 sm:w-72 h-[30px] px-2.5 text-[12px] font-mono border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
               />
             </div>
@@ -932,11 +1027,11 @@ function LogisticsContent() {
           )}
 
           <form onSubmit={handleSaveTaxClearanceBill} className="space-y-4">
-            {/* Row 1: transport date & transport company */}
+            {/* Row 1: Shipping date / transport date & transport company */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="block text-[12px] text-slate-600 font-medium">
-                  transport date
+                  {isShippingMode ? "Shipping date" : "transport date"}
                 </label>
                 <input
                   type="date"
@@ -950,7 +1045,7 @@ function LogisticsContent() {
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <label className="text-[12px] text-slate-600 font-medium">
-                    transport company
+                    {isShippingMode ? "Transport company" : "transport company"}
                   </label>
                   <button
                     type="button"
@@ -977,170 +1072,198 @@ function LogisticsContent() {
               </div>
             </div>
 
-            {/* Row 2: choose car + clearance fee + tax payment + "+ Add to list" */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end pt-1">
-              <div className="md:col-span-4 space-y-1">
-                <label className="block text-[12px] text-slate-600 font-medium">
-                  choose car / វាយលេខតួ (VIN)
-                </label>
-                <div ref={carDropdownRef} className="relative w-full">
-                  <div className="relative flex items-center">
-                    <Search className="absolute left-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-                    <input
-                      type="text"
-                      placeholder="Type VIN (លេខតួ) or search car..."
-                      value={carSearchTerm}
-                      onFocus={() => setIsCarDropdownOpen(true)}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setCarSearchTerm(val);
-                        setIsCarDropdownOpen(true);
-                        // If exact match found, auto-select
-                        const match = vehicles.find(
-                          (v) => v.vin.toLowerCase() === val.toLowerCase().trim()
-                        );
-                        if (match) {
-                          setSelectedCarVin(match.vin);
-                        } else if (selectedCarVin) {
-                          setSelectedCarVin("");
+            {/* Row 2: choose car + fee inputs + "+ Add to list" */}
+            {isShippingMode ? (
+              <div className="space-y-3 pt-1">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                  {/* Choose car */}
+                  <div className="space-y-1">
+                    <label className="block text-[12px] text-slate-600 font-medium">
+                      Choose car
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        readOnly
+                        onClick={handleOpenCarModal}
+                        value={
+                          selectedCarObj
+                            ? `${selectedCarObj.brand} ${selectedCarObj.model} (${selectedCarObj.vin})`
+                            : ""
                         }
-                      }}
-                      className="w-full h-[30px] pl-8 pr-14 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
-                    />
-                    <div className="absolute right-1.5 flex items-center gap-1">
-                      {carSearchTerm && (
+                        placeholder="choose car"
+                        className="w-full h-[30px] px-2.5 pr-8 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 cursor-pointer focus:outline-none focus:border-[#409eff]"
+                      />
+                      {selectedCarVin ? (
                         <button
                           type="button"
-                          onClick={handleClearCarSelection}
-                          className="h-5 w-5 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
-                          title="Clear search"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCarVin("");
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                          title="Clear selection"
                         >
-                          <X className="h-3 w-3" />
+                          <X className="h-3.5 w-3.5" />
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setIsCarDropdownOpen((prev) => !prev)}
-                        className="h-5 w-5 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
-                        title="Toggle list"
-                      >
-                        <ChevronDown
-                          className={cn(
-                            "h-3.5 w-3.5 transition-transform text-slate-500",
-                            isCarDropdownOpen && "rotate-180"
-                          )}
+                      ) : (
+                        <Search
+                          onClick={handleOpenCarModal}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 cursor-pointer pointer-events-none"
                         />
-                      </button>
+                      )}
                     </div>
                   </div>
 
-                  {/* Dropdown Menu (Floating list) */}
-                  {isCarDropdownOpen && (
-                    <div className="absolute z-50 left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white border border-slate-200 rounded-[3px] shadow-xl text-[12px]">
-                      {filteredCarOptions.length === 0 ? (
-                        <div className="p-3 text-center text-slate-400 italic text-[11px]">
-                          No car matches &quot;{carSearchTerm}&quot;
-                        </div>
-                      ) : (
-                        filteredCarOptions.map((v) => {
-                          const isSelected = v.vin === selectedCarVin;
-                          return (
-                            <div
-                              key={v.vin}
-                              onClick={() => handleSelectCar(v)}
-                              className={cn(
-                                "px-3 py-2 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors flex items-center justify-between",
-                                isSelected
-                                  ? "bg-blue-50 text-[#1976d2] font-semibold"
-                                  : "hover:bg-slate-50 text-slate-800"
-                              )}
-                            >
-                              <div className="space-y-0.5">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-semibold text-slate-900">
-                                    {v.brand} {v.model}
-                                  </span>
-                                  <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
-                                    {v.madeYear || 2026}
-                                  </span>
-                                  {v.color && (
-                                    <span className="text-[10px] text-slate-500 uppercase">
-                                      • {v.color}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="font-mono text-[11px] text-[#1976d2]">
-                                  VIN: {v.vin}
-                                </div>
-                              </div>
-                              {isSelected && (
-                                <Check className="h-4 w-4 text-[#1976d2] shrink-0" />
-                              )}
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  )}
+                  {/* Transport fee */}
+                  <div className="space-y-1">
+                    <label className="block text-[12px] text-slate-600 font-medium">
+                      Transport fee
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="clearance fee"
+                      value={inputTranFee}
+                      onChange={(e) =>
+                        setInputTranFee(e.target.value === "" ? "" : Number(e.target.value))
+                      }
+                      className="w-full h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
+                    />
+                  </div>
+
+                  {/* Container fee */}
+                  <div className="space-y-1">
+                    <label className="block text-[12px] text-slate-600 font-medium">
+                      Container fee
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="clearance fee"
+                      value={inputContainerFee}
+                      onChange={(e) =>
+                        setInputContainerFee(e.target.value === "" ? "" : Number(e.target.value))
+                      }
+                      className="w-full h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
+                    />
+                  </div>
+
+                  {/* Labor fee */}
+                  <div className="space-y-1">
+                    <label className="block text-[12px] text-slate-600 font-medium">
+                      Labor fee
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="$ tax payment"
+                      value={inputLaborFee}
+                      onChange={(e) =>
+                        setInputLaborFee(e.target.value === "" ? "" : Number(e.target.value))
+                      }
+                      className="w-full h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
+                    />
+                  </div>
+                </div>
+
+                {/* + Add to list button matching Reference Image 1 */}
+                <div className="pt-0.5">
+                  <button
+                    type="button"
+                    onClick={handleAddCarToList}
+                    className="h-[30px] px-3.5 bg-[#00a884] hover:bg-[#008e70] text-white rounded-[3px] text-[12px] font-semibold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
+                  >
+                    <PlusCircle className="h-4 w-4 shrink-0" />
+                    <span>Add to list</span>
+                  </button>
                 </div>
               </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end pt-1">
+                <div className="md:col-span-4 space-y-1">
+                  <label className="block text-[12px] text-slate-600 font-medium">
+                    choose car
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      readOnly
+                      onClick={handleOpenCarModal}
+                      value={
+                        selectedCarObj
+                          ? `${selectedCarObj.brand} ${selectedCarObj.model} (${selectedCarObj.vin})`
+                          : ""
+                      }
+                      placeholder="choose car"
+                      className="w-full h-[30px] px-2.5 pr-8 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 cursor-pointer focus:outline-none focus:border-[#409eff]"
+                    />
+                    {selectedCarVin ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedCarVin("");
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        title="Clear selection"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    ) : (
+                      <Search
+                        onClick={handleOpenCarModal}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 cursor-pointer pointer-events-none"
+                      />
+                    )}
+                  </div>
+                </div>
 
-              <div className="md:col-span-3 space-y-1">
-                <label className="block text-[12px] text-slate-600 font-medium">
-                  clearance fee
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="clearance fee"
-                  value={inputClearanceFee}
-                  onChange={(e) =>
-                    setInputClearanceFee(e.target.value === "" ? "" : Number(e.target.value))
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddCarToList();
+                <div className="md:col-span-3 space-y-1">
+                  <label className="block text-[12px] text-slate-600 font-medium">
+                    clearance fee
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="clearance fee"
+                    value={inputClearanceFee}
+                    onChange={(e) =>
+                      setInputClearanceFee(e.target.value === "" ? "" : Number(e.target.value))
                     }
-                  }}
-                  className="w-full h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
-                />
-              </div>
+                    className="w-full h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
+                  />
+                </div>
 
-              <div className="md:col-span-3 space-y-1">
-                <label className="block text-[12px] text-slate-600 font-medium">
-                  tax payment
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="$ tax payment"
-                  value={inputTaxPayment}
-                  onChange={(e) =>
-                    setInputTaxPayment(e.target.value === "" ? "" : Number(e.target.value))
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddCarToList();
+                <div className="md:col-span-3 space-y-1">
+                  <label className="block text-[12px] text-slate-600 font-medium">
+                    tax payment
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="$ tax payment"
+                    value={inputTaxPayment}
+                    onChange={(e) =>
+                      setInputTaxPayment(e.target.value === "" ? "" : Number(e.target.value))
                     }
-                  }}
-                  className="w-full h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
-                />
-              </div>
+                    className="w-full h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
+                  />
+                </div>
 
-              <div className="md:col-span-2">
-                <button
-                  type="button"
-                  onClick={handleAddCarToList}
-                  className="w-full h-[30px] px-4 bg-[#00a884] hover:bg-[#008e70] text-white rounded-[2px] text-[12px] font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
-                  title="Add to list"
-                >
-                  <Plus className="h-3.5 w-3.5 shrink-0" />
-                  <span>Add to list</span>
-                </button>
+                <div className="md:col-span-2">
+                  <button
+                    type="button"
+                    onClick={handleAddCarToList}
+                    className="w-full h-[30px] px-4 bg-[#00a884] hover:bg-[#008e70] text-white rounded-[2px] text-[12px] font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
+                    title="Add to list"
+                  >
+                    <PlusCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>Add to list</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Section: Car list Table */}
             <div className="space-y-1 pt-3">
@@ -1149,24 +1272,40 @@ function LogisticsContent() {
               <div className="border-t border-b border-slate-200 overflow-x-auto bg-white">
                 <table className="w-full text-left border-collapse text-[12px]">
                   <thead>
-                    <tr className="border-b border-slate-200 text-[#2c3e50] font-semibold text-[12px]">
-                      <th className="py-2 px-3 w-10 text-slate-700">#</th>
-                      <th className="py-2 px-3 text-slate-700">Brand</th>
-                      <th className="py-2 px-3 text-slate-700">Model</th>
-                      <th className="py-2 px-3 text-slate-700">Vin</th>
-                      <th className="py-2 px-3 w-20 text-slate-700">Year</th>
-                      <th className="py-2 px-3 w-24 text-slate-700">Color</th>
-                      <th className="py-2 px-3 w-28 text-slate-700">Clearance</th>
-                      <th className="py-2 px-3 w-28 text-slate-700">Tax payment</th>
-                      <th className="py-2 px-3 w-28 text-slate-700">Total</th>
-                      <th className="py-2 px-3 w-14 text-center text-slate-700">Action</th>
-                    </tr>
+                    {isShippingMode ? (
+                      <tr className="border-b border-slate-200 text-[#2c3e50] font-semibold text-[12px]">
+                        <th className="py-2 px-3 w-10 text-slate-700">#</th>
+                        <th className="py-2 px-3 text-slate-700">Brand</th>
+                        <th className="py-2 px-3 text-slate-700">Model</th>
+                        <th className="py-2 px-3 text-slate-700">Vin</th>
+                        <th className="py-2 px-3 w-20 text-slate-700">Year</th>
+                        <th className="py-2 px-3 w-24 text-slate-700">Color</th>
+                        <th className="py-2 px-3 w-28 text-slate-700">Tran fee</th>
+                        <th className="py-2 px-3 w-28 text-slate-700">Container fee</th>
+                        <th className="py-2 px-3 w-28 text-slate-700">Labor fee</th>
+                        <th className="py-2 px-3 w-28 text-slate-700">Total</th>
+                        <th className="py-2 px-3 w-14 text-center text-slate-700">Action</th>
+                      </tr>
+                    ) : (
+                      <tr className="border-b border-slate-200 text-[#2c3e50] font-semibold text-[12px]">
+                        <th className="py-2 px-3 w-10 text-slate-700">#</th>
+                        <th className="py-2 px-3 text-slate-700">Brand</th>
+                        <th className="py-2 px-3 text-slate-700">Model</th>
+                        <th className="py-2 px-3 text-slate-700">Vin</th>
+                        <th className="py-2 px-3 w-20 text-slate-700">Year</th>
+                        <th className="py-2 px-3 w-24 text-slate-700">Color</th>
+                        <th className="py-2 px-3 w-28 text-slate-700">Clearance</th>
+                        <th className="py-2 px-3 w-28 text-slate-700">Tax payment</th>
+                        <th className="py-2 px-3 w-28 text-slate-700">Total</th>
+                        <th className="py-2 px-3 w-14 text-center text-slate-700">Action</th>
+                      </tr>
+                    )}
                   </thead>
                   <tbody>
                     {addedCars.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={10}
+                          colSpan={isShippingMode ? 11 : 10}
                           className="py-6 text-center text-xs text-slate-400 italic"
                         >
                           No car added to list yet. Select a car above, enter fees, and click &quot;Add to list&quot;.
@@ -1186,12 +1325,28 @@ function LogisticsContent() {
                           </td>
                           <td className="py-2.5 px-3 text-slate-600 font-mono">{car.year}</td>
                           <td className="py-2.5 px-3 text-slate-600">{car.color}</td>
-                          <td className="py-2.5 px-3 font-mono text-slate-800">
-                            ${car.clearanceFee.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="py-2.5 px-3 font-mono text-slate-800">
-                            ${car.taxPayment.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                          </td>
+                          {isShippingMode ? (
+                            <>
+                              <td className="py-2.5 px-3 font-mono text-slate-800">
+                                ${(car.tranFee || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="py-2.5 px-3 font-mono text-slate-800">
+                                ${(car.containerFee || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="py-2.5 px-3 font-mono text-slate-800">
+                                ${(car.laborFee || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="py-2.5 px-3 font-mono text-slate-800">
+                                ${car.clearanceFee.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="py-2.5 px-3 font-mono text-slate-800">
+                                ${car.taxPayment.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                              </td>
+                            </>
+                          )}
                           <td className="py-2.5 px-3 font-mono font-bold text-slate-900">
                             ${car.total.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                           </td>
@@ -1783,6 +1938,219 @@ function LogisticsContent() {
           </div>
         </div>
       )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          MODAL: "Select car" (Matching Reference System)
+         ═══════════════════════════════════════════════════════════════════ */}
+      <Dialog open={isCarModalOpen} onOpenChange={setIsCarModalOpen}>
+        <DialogContent className="sm:max-w-[760px] max-w-[95vw] w-full p-0 overflow-hidden rounded-[4px] border border-slate-200 shadow-2xl">
+          {/* Dark blue modal header */}
+          <div className="bg-[#102a4e] text-white px-5 py-3 flex items-center justify-between">
+            <DialogTitle className="text-[14px] font-semibold tracking-wide text-white">
+              Select car
+            </DialogTitle>
+            <button
+              type="button"
+              onClick={() => setIsCarModalOpen(false)}
+              className="text-white/80 hover:text-white cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="p-4 space-y-3 bg-white text-xs">
+            {/* Filter inputs */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-slate-600">Brand</label>
+                <input
+                  type="text"
+                  placeholder="Brand name"
+                  value={modalBrandFilter}
+                  onChange={(e) => {
+                    setModalBrandFilter(e.target.value);
+                    setModalCurrentPage(1);
+                  }}
+                  className="w-full h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-slate-600">Model</label>
+                <input
+                  type="text"
+                  placeholder="Car model"
+                  value={modalModelFilter}
+                  onChange={(e) => {
+                    setModalModelFilter(e.target.value);
+                    setModalCurrentPage(1);
+                  }}
+                  className="w-full h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-slate-600">Year</label>
+                <input
+                  type="text"
+                  placeholder="Year"
+                  value={modalYearFilter}
+                  onChange={(e) => {
+                    setModalYearFilter(e.target.value);
+                    setModalCurrentPage(1);
+                  }}
+                  className="w-full h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-slate-600">Vin number</label>
+                <input
+                  type="text"
+                  placeholder="Engine"
+                  value={modalVinFilter}
+                  onChange={(e) => {
+                    setModalVinFilter(e.target.value);
+                    setModalCurrentPage(1);
+                  }}
+                  className="w-full h-[30px] px-2.5 text-[12px] border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
+                />
+              </div>
+            </div>
+
+            {/* Title: Car list */}
+            <div className="font-bold text-[13px] text-[#2c3e50] pt-1">Car list</div>
+
+            {/* Table */}
+            <div className="border border-slate-200 rounded-[2px] overflow-x-auto">
+              <table className="w-full border-collapse text-[11px] text-left">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold">
+                    <th className="py-2 px-3 w-8 text-center">#</th>
+                    <th className="py-2 px-3">Brand</th>
+                    <th className="py-2 px-3">Model</th>
+                    <th className="py-2 px-3">Chassis</th>
+                    <th className="py-2 px-3">Color</th>
+                    <th className="py-2 px-3">Year</th>
+                    <th className="py-2 px-3 w-14 text-center">Select</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {modalPaginatedVehicles.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-6 text-center text-slate-400 italic">
+                        No cars found matching filters
+                      </td>
+                    </tr>
+                  ) : (
+                    modalPaginatedVehicles.map((v, idx) => {
+                      const rowNum = (modalCurrentPage - 1) * modalPageSize + idx + 1;
+                      const isChecked = modalSelectedVin === v.vin;
+                      return (
+                        <tr
+                          key={v.vin}
+                          onClick={() => setModalSelectedVin(v.vin)}
+                          onDoubleClick={() => {
+                            setSelectedCarVin(v.vin);
+                            setIsCarModalOpen(false);
+                          }}
+                          className={cn(
+                            "border-b border-slate-100 transition-colors cursor-pointer",
+                            isChecked ? "bg-blue-50/70" : "hover:bg-slate-50"
+                          )}
+                        >
+                          <td className="py-2 px-3 text-center text-slate-600">{rowNum}</td>
+                          <td className="py-2 px-3 font-semibold text-slate-800 uppercase">
+                            {v.brand}
+                          </td>
+                          <td className="py-2 px-3 text-slate-700">{v.model}</td>
+                          <td className="py-2 px-3 font-mono text-[11px] text-slate-800">{v.vin}</td>
+                          <td className="py-2 px-3 uppercase text-slate-600">{v.color || "-"}</td>
+                          <td className="py-2 px-3 text-slate-600">{v.madeYear || 2026}</td>
+                          <td
+                            className="py-2 px-3 text-center"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="radio"
+                              name="selectCarModalRadio"
+                              checked={isChecked}
+                              onChange={() => setModalSelectedVin(v.vin)}
+                              className="h-4 w-4 text-[#1976d2] cursor-pointer"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination & Footer actions */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-2">
+              {/* Pagination */}
+              <div className="flex items-center gap-1 text-[11px] text-slate-600">
+                <button
+                  type="button"
+                  disabled={modalCurrentPage <= 1}
+                  onClick={() => setModalCurrentPage((p) => Math.max(1, p - 1))}
+                  className="px-2 py-1 border border-slate-200 rounded-[2px] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 cursor-pointer"
+                >
+                  « Previous
+                </button>
+                {Array.from({ length: Math.min(5, modalTotalPages) }, (_, i) => {
+                  let pageNum = i + 1;
+                  if (modalTotalPages > 5 && modalCurrentPage > 3) {
+                    pageNum = modalCurrentPage - 2 + i;
+                    if (pageNum > modalTotalPages) pageNum = modalTotalPages - 4 + i;
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      onClick={() => setModalCurrentPage(pageNum)}
+                      className={cn(
+                        "min-w-[24px] h-[24px] px-1.5 flex items-center justify-center border rounded-[2px] cursor-pointer text-[11px]",
+                        modalCurrentPage === pageNum
+                          ? "bg-[#1976d2] text-white border-[#1976d2] font-semibold"
+                          : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                      )}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  disabled={modalCurrentPage >= modalTotalPages}
+                  onClick={() => setModalCurrentPage((p) => Math.min(modalTotalPages, p + 1))}
+                  className="px-2 py-1 border border-slate-200 rounded-[2px] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 cursor-pointer"
+                >
+                  Next »
+                </button>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCarModalOpen(false)}
+                  className="px-3 py-1.5 text-[11px] border border-slate-300 text-slate-700 rounded-[2px] hover:bg-slate-50 cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  disabled={!modalSelectedVin}
+                  onClick={handleConfirmCarSelection}
+                  className="px-3.5 py-1.5 text-[11px] bg-[#1976d2] hover:bg-[#1565c0] text-white rounded-[2px] font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs"
+                >
+                  <Plus className="h-3 w-3" />
+                  <span>Select</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ═══════════════════════════════════════════════════════════════════
           MODAL: "Adding new logistic company" (Screenshot 4)
