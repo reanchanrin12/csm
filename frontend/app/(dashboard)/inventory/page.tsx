@@ -70,15 +70,16 @@ export default function InventoryPage() {
     });
   }, [vehicles, filterBrand, filterModel, filterVin, filterYear, filterColor, filterStockStatus]);
 
-  // Table pagination state (10 items per page limit)
+  // Table pagination state (configurable limit per page: 10, 25, 50, 100, or All)
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterBrand, filterModel, filterVin, filterYear, filterColor, filterStockStatus]);
+  }, [filterBrand, filterModel, filterVin, filterYear, filterColor, filterStockStatus, pageSize]);
 
   const paginatedVehicles = useMemo(() => {
+    if (pageSize === -1) return filteredVehicles;
     const start = (currentPage - 1) * pageSize;
     return filteredVehicles.slice(start, start + pageSize);
   }, [filteredVehicles, currentPage, pageSize]);
@@ -298,9 +299,27 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* 4. Subtitle */}
-      <div className="mb-2">
+      {/* 4. Subtitle & Show entries */}
+      <div className="mb-2 flex items-center justify-between">
         <p className="text-[12px] text-[#6c757d]">costomize and view brand list</p>
+        <div className="flex items-center gap-1.5 text-xs text-slate-600">
+          <span>Show:</span>
+          <select
+            value={pageSize}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setCurrentPage(1);
+            }}
+            className="h-7 px-2 border border-slate-300 rounded bg-white text-xs text-slate-700 focus:outline-none focus:border-[#337ab7] cursor-pointer"
+          >
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={-1}>All</option>
+          </select>
+          <span>entries</span>
+        </div>
       </div>
 
       {/* 5. Car Purchased Table matching Screenshot + Edit Button */}
@@ -340,7 +359,7 @@ export default function InventoryPage() {
                   className="border-b border-[#f1f3f5] hover:bg-[#f8f9fa] transition-colors"
                 >
                   <td className="py-3 px-3 text-[#6c757d] font-bold">
-                    {(currentPage - 1) * pageSize + index + 1}
+                    {pageSize === -1 ? index + 1 : (currentPage - 1) * pageSize + index + 1}
                   </td>
                   <td className="py-2 px-3">
                     <Link

@@ -138,15 +138,16 @@ export default function SoldListPage() {
     });
   }, [sales, receiptFilter, brandFilter, modelFilter, vinFilter, dateFilter, branchFilter]);
 
-  // Table pagination state (10 items per page limit to prevent slow rendering)
+  // Table pagination state (configurable limit per page: 10, 25, 50, 100, or All)
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [receiptFilter, brandFilter, modelFilter, vinFilter, dateFilter, branchFilter]);
+  }, [receiptFilter, brandFilter, modelFilter, vinFilter, dateFilter, branchFilter, pageSize]);
 
   const paginatedSales = useMemo(() => {
+    if (pageSize === -1) return filteredSales;
     const start = (currentPage - 1) * pageSize;
     return filteredSales.slice(start, start + pageSize);
   }, [filteredSales, currentPage, pageSize]);
@@ -278,9 +279,27 @@ export default function SoldListPage() {
         </div>
       </div>
 
-      {/* 4. Subtitle line */}
-      <div className="pt-2">
+      {/* 4. Subtitle line & Show Entries Selector */}
+      <div className="flex items-center justify-between pt-2">
         <p className="text-xs text-muted-foreground">Listing all sold car ({filteredSales.length})</p>
+        <div className="flex items-center gap-1.5 text-xs text-slate-600">
+          <span>Show:</span>
+          <select
+            value={pageSize}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setCurrentPage(1);
+            }}
+            className="h-7 px-2 border border-slate-300 rounded bg-white text-xs text-slate-700 focus:outline-none focus:border-[#337ab7] cursor-pointer"
+          >
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={-1}>All</option>
+          </select>
+          <span>entries</span>
+        </div>
       </div>
 
       {/* 5. Data Table matching Screenshot 111223 */}

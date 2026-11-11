@@ -20,9 +20,10 @@ export function TablePagination({
   onPageChange,
   className = "",
 }: TablePaginationProps) {
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  const startItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const endItem = Math.min(totalItems, currentPage * pageSize);
+  const effectivePageSize = pageSize <= 0 ? Math.max(1, totalItems) : pageSize;
+  const totalPages = Math.max(1, Math.ceil(totalItems / effectivePageSize));
+  const startItem = totalItems === 0 ? 0 : (currentPage - 1) * effectivePageSize + 1;
+  const endItem = Math.min(totalItems, currentPage * effectivePageSize);
 
   // Generate page numbers array with intelligent ellipsis
   const getPageNumbers = () => {
