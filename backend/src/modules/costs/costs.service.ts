@@ -151,9 +151,18 @@ export class CostsService {
   }
 
   // 2. Get bills list filtered by category, VIN or billNumber
-  async getBills(category?: CostCategory, searchVin?: string, billNumber?: string) {
+  async getBills(
+    category?: CostCategory,
+    searchVin?: string,
+    billNumber?: string,
+    type?: 'shipping' | 'tax_clearance',
+  ) {
     const where: any = {};
-    if (category) {
+    if (type === 'shipping') {
+      where.category = { in: ['TRANSPORT', 'CONTAINER', 'LABOR'] };
+    } else if (type === 'tax_clearance') {
+      where.category = { in: ['CLEARANCE', 'TAX'] };
+    } else if (category) {
       where.category = category;
     }
     if (billNumber && billNumber.trim()) {

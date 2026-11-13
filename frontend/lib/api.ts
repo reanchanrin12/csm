@@ -371,11 +371,12 @@ export const costService = {
       body: JSON.stringify(dto),
     }),
 
-  getBills: (category?: string, vin?: string, billNumber?: string) => {
+  getBills: (category?: string, vin?: string, billNumber?: string, type?: string) => {
     const params = new URLSearchParams();
     if (category) params.set("category", category);
     if (vin) params.set("vin", vin);
     if (billNumber) params.set("billNumber", billNumber);
+    if (type) params.set("type", type);
     const qs = params.toString();
     return apiFetch<LandedCostBillRecord[]>(qs ? `/costs/bills?${qs}` : "/costs/bills");
   },

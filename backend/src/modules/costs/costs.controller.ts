@@ -39,10 +39,11 @@ export class CostsController {
   @Get('bills')
   getBills(
     @Query('category') category?: CostCategory,
+    @Query('type') type?: 'shipping' | 'tax_clearance',
     @Query('vin') vin?: string,
     @Query('billNumber') billNumber?: string,
   ) {
-    return this.costsService.getBills(category, vin, billNumber);
+    return this.costsService.getBills(category, vin, billNumber, type);
   }
 
   @Get('parts-repairs')

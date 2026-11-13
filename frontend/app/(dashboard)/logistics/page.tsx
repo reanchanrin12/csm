@@ -154,7 +154,7 @@ function LogisticsContent() {
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState<number>(10);
 
   // View / Edit Bill Modal (matching reference screenshot)
   const [selectedBill, setSelectedBill] = useState<BillItem | null>(null);
@@ -287,7 +287,7 @@ function LogisticsContent() {
     setError(null);
     try {
       const [billsData, optionsData, countriesData] = await Promise.all([
-        costService.getBills(),
+        costService.getBills(undefined, undefined, undefined, "tax_clearance"),
         costService.getOptions(),
         settingsService.getCountries().catch(() => []),
       ]);
@@ -386,11 +386,13 @@ function LogisticsContent() {
     });
   }, [bills, appliedBillFilter, appliedVinFilter, billSortKey, billSortOrder]);
 
-  const totalPages = Math.ceil(sortedBills.length / pageSize) || 1;
+  const effectivePageSize = pageSize <= 0 ? Math.max(1, sortedBills.length) : pageSize;
+  const totalPages = Math.ceil(sortedBills.length / effectivePageSize) || 1;
   const paginatedBills = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return sortedBills.slice(start, start + pageSize);
-  }, [sortedBills, currentPage]);
+    if (pageSize <= 0) return sortedBills;
+    const start = (currentPage - 1) * effectivePageSize;
+    return sortedBills.slice(start, start + effectivePageSize);
+  }, [sortedBills, currentPage, effectivePageSize, pageSize]);
 
   // Sort logistic companies
   const sortedSuppliers = useMemo(() => {
@@ -1660,7 +1662,7 @@ function LogisticsContent() {
                             className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors text-xs"
                           >
                             <td className="py-2.5 px-3 text-slate-500 font-mono">
-                              {(currentPage - 1) * pageSize + index + 1}
+                              {pageSize <= 0 ? index + 1 : (currentPage - 1) * effectivePageSize + index + 1}
                             </td>
                             <td className="py-2.5 px-3 text-slate-800 font-medium max-w-md truncate">
                               {b.billNumber}
@@ -1705,16 +1707,35 @@ function LogisticsContent() {
                 )}
 
                 {/* Pagination Controls */}
-                <div className="flex items-center justify-between px-4 py-3 bg-slate-50/60 border-t border-slate-100">
-                  <span className="text-xs text-slate-500">
-                    Showing <span className="font-semibold text-slate-700">{sortedBills.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</span> to{" "}
-                    <span className="font-semibold text-slate-700">{Math.min(currentPage * pageSize, sortedBills.length)}</span> of{" "}
-                    <span className="font-semibold text-slate-700">{sortedBills.length}</span> bills
-                  </span>
+                <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-slate-50/60 border-t border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500">
+                      Showing <span className="font-semibold text-slate-700">{sortedBills.length === 0 ? 0 : (currentPage - 1) * effectivePageSize + 1}</span> to{" "}
+                      <span className="font-semibold text-slate-700">{pageSize <= 0 ? sortedBills.length : Math.min(currentPage * effectivePageSize, sortedBills.length)}</span> of{" "}
+                      <span className="font-semibold text-slate-700">{sortedBills.length}</span> bills
+                    </span>
+                    <div className="flex items-center gap-1.5 ml-3">
+                      <span className="text-[11px] text-slate-500">Show:</span>
+                      <select
+                        value={pageSize}
+                        onChange={(e) => {
+                          setPageSize(Number(e.target.value));
+                          setCurrentPage(1);
+                        }}
+                        className="h-[26px] px-2 text-xs border border-[#dcdfe6] rounded-[2px] bg-white text-slate-700 focus:outline-none focus:border-[#409eff]"
+                      >
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                        <option value={-1}>All</option>
+                      </select>
+                    </div>
+                  </div>
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      disabled={currentPage <= 1}
+                      disabled={currentPage <= 1 || pageSize <= 0}
                       onClick={() => setCurrentPage(1)}
                       className="h-7 px-2 text-xs border border-slate-300 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer transition-colors"
                     >
@@ -1722,18 +1743,18 @@ function LogisticsContent() {
                     </button>
                     <button
                       type="button"
-                      disabled={currentPage <= 1}
+                      disabled={currentPage <= 1 || pageSize <= 0}
                       onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       className="h-7 px-2.5 text-xs border border-slate-300 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer transition-colors"
                     >
                       Previous
                     </button>
-                    <span className="h-7 px-3 text-xs font-semibold rounded-lg bg-blue-600 text-white flex items-center justify-center">
+                    <span className="h-7 px-3 text-xs font-semibold rounded-lg bg-[#409eff] text-white flex items-center justify-center">
                       {currentPage}
                     </span>
                     <button
                       type="button"
-                      disabled={currentPage >= totalPages}
+                      disabled={currentPage >= totalPages || pageSize <= 0}
                       onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                       className="h-7 px-2.5 text-xs border border-slate-300 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer transition-colors"
                     >
@@ -1741,7 +1762,7 @@ function LogisticsContent() {
                     </button>
                     <button
                       type="button"
-                      disabled={currentPage >= totalPages}
+                      disabled={currentPage >= totalPages || pageSize <= 0}
                       onClick={() => setCurrentPage(totalPages)}
                       className="h-7 px-2 text-xs border border-slate-300 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer transition-colors"
                     >

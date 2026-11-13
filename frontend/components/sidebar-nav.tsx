@@ -121,8 +121,8 @@ const csmNavSections: NavSection[] = [
         icon: Ship,
         roles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "ACCOUNTANT"],
         subItems: [
-          { name: "Add new shipping", href: "/logistics?tab=shipping" },
-          { name: "Shipping list", href: "/logistics" },
+          { name: "Add new shipping", href: "/shipping?tab=new" },
+          { name: "Shipping list", href: "/shipping" },
         ],
       },
       {
