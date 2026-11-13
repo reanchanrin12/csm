@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { costService, settingsService } from "@/lib/api";
+import { ConfirmDeleteModal } from "@/components/ui/confirm-delete-modal";
 
 // ── Types ─────────────────────────────────────────────────────────────
 interface BillItem {
@@ -164,6 +165,27 @@ function LogisticsContent() {
   const [editDescription, setEditDescription] = useState("");
   const [billSaving, setBillSaving] = useState(false);
   const [billSaveError, setBillSaveError] = useState<string | null>(null);
+
+  // Styled Confirm Delete Dialog State
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteDialogTitle, setDeleteDialogTitle] = useState("Confirm Deletion");
+  const [deleteItemName, setDeleteItemName] = useState<string | undefined>(undefined);
+  const [deleteDialogDescription, setDeleteDialogDescription] = useState<React.ReactNode>(undefined);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [pendingDeleteAction, setPendingDeleteAction] = useState<(() => Promise<void>) | null>(null);
+
+  const requestConfirmDelete = (config: {
+    title?: string;
+    itemName?: string;
+    description?: React.ReactNode;
+    onConfirm: () => Promise<void>;
+  }) => {
+    setDeleteDialogTitle(config.title || "Confirm Deletion");
+    setDeleteItemName(config.itemName);
+    setDeleteDialogDescription(config.description);
+    setPendingDeleteAction(() => config.onConfirm);
+    setDeleteConfirmOpen(true);
+  };
 
   // ── "Adding new tax & clearance fee" Form State (Screenshot 3) ─────────
   const [invoiceNumber, setInvoiceNumber] = useState("");
@@ -774,26 +796,30 @@ function LogisticsContent() {
     }
   };
 
-  const handleDeleteBill = async (id: string, billNumber: string) => {
-    if (!confirm(`Are you sure you want to delete bill "${billNumber}"?`)) return;
-    try {
-      await costService.deleteBill(id);
-      setActionSuccess(`Bill "${billNumber}" deleted successfully.`);
-      await fetchData();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Failed to delete bill");
-    }
+  const handleDeleteBill = (id: string, billNumber: string) => {
+    requestConfirmDelete({
+      title: "Confirm Delete Bill",
+      itemName: `Bill No: ${billNumber}`,
+      description: "Are you sure you want to delete this bill? This will remove all associated tax & clearance fees from the linked vehicles.",
+      onConfirm: async () => {
+        await costService.deleteBill(id);
+        setActionSuccess(`Bill "${billNumber}" deleted successfully.`);
+        await fetchData();
+      },
+    });
   };
 
-  const handleDeleteCompany = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete company "${name}"?`)) return;
-    try {
-      await settingsService.deleteSupplier(id);
-      setActionSuccess(`Company "${name}" deleted successfully.`);
-      await fetchData();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Failed to delete company");
-    }
+  const handleDeleteCompany = (id: string, name: string) => {
+    requestConfirmDelete({
+      title: "Confirm Delete Company",
+      itemName: name,
+      description: `Are you sure you want to delete logistic company "${name}"?`,
+      onConfirm: async () => {
+        await settingsService.deleteSupplier(id);
+        setActionSuccess(`Company "${name}" deleted successfully.`);
+        await fetchData();
+      },
+    });
   };
 
   interface BillVehicleRow {
@@ -890,23 +916,20 @@ function LogisticsContent() {
     });
   };
 
-  const handleRemoveCarRow = async (index: number) => {
+  const handleRemoveCarRow = (index: number) => {
     if (editCarRows.length === 1 && selectedBill) {
-      if (
-        confirm(
-          `Removing the only vehicle will delete this invoice "${selectedBill.billNumber}". Do you want to delete this invoice completely?`
-        )
-      ) {
-        try {
+      requestConfirmDelete({
+        title: "Delete Empty Invoice",
+        itemName: `Invoice No: ${selectedBill.billNumber}`,
+        description: `Removing the only vehicle will delete invoice "${selectedBill.billNumber}". Do you want to delete this invoice completely?`,
+        onConfirm: async () => {
           await costService.deleteBill(selectedBill.id);
           setActionSuccess(`Invoice "${selectedBill.billNumber}" deleted successfully.`);
           setSelectedBill(null);
           await fetchData();
-        } catch (err: unknown) {
-          alert(err instanceof Error ? err.message : "Failed to delete invoice");
-        }
-        return;
-      }
+        },
+      });
+      return;
     }
     setEditCarRows((prev) => prev.filter((_, i) => i !== index));
   };
@@ -2616,22 +2639,19 @@ function LogisticsContent() {
               <div className="flex items-center justify-between pt-3 border-t border-slate-200">
                 <button
                   type="button"
-                  onClick={async () => {
+                  onClick={() => {
                     if (!selectedBill) return;
-                    if (
-                      confirm(
-                        `Are you sure you want to delete invoice "${selectedBill.billNumber}"? This will remove all associated fees from the vehicles.`
-                      )
-                    ) {
-                      try {
+                    requestConfirmDelete({
+                      title: "Confirm Delete Invoice",
+                      itemName: `Invoice No: ${selectedBill.billNumber}`,
+                      description: "Are you sure you want to delete this invoice? This will remove all associated fees from the vehicles.",
+                      onConfirm: async () => {
                         await costService.deleteBill(selectedBill.id);
                         setActionSuccess(`Invoice "${selectedBill.billNumber}" deleted successfully.`);
                         setSelectedBill(null);
                         await fetchData();
-                      } catch (err: unknown) {
-                        alert(err instanceof Error ? err.message : "Failed to delete invoice");
-                      }
-                    }
+                      },
+                    });
                   }}
                   className="h-[32px] px-3.5 bg-red-600 hover:bg-red-700 text-white rounded-[2px] text-xs font-semibold cursor-pointer flex items-center gap-1.5 shadow-2xs transition-colors"
                 >
@@ -2662,6 +2682,28 @@ function LogisticsContent() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Styled Confirmation Delete Modal */}
+      <ConfirmDeleteModal
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title={deleteDialogTitle}
+        itemName={deleteItemName}
+        description={deleteDialogDescription}
+        loading={deleteLoading}
+        onConfirm={async () => {
+          if (!pendingDeleteAction) return;
+          setDeleteLoading(true);
+          try {
+            await pendingDeleteAction();
+            setDeleteConfirmOpen(false);
+          } catch (err: unknown) {
+            alert(err instanceof Error ? err.message : "Failed to delete");
+          } finally {
+            setDeleteLoading(false);
+          }
+        }}
+      />
     </div>
   );
 }
