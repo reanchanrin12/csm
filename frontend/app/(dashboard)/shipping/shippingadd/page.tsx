@@ -323,20 +323,11 @@ export default function AddNewShippingFeePage() {
       const dto = {
         billNumber: invoiceNumber.trim(),
         supplierId: transportCompanyId,
-        category: "LOGISTICS",
-        type: "shipping" as const,
-        billDate: new Date(shippingDate).toISOString(),
+        category: "TRANSPORT" as const,
+        totalAmount: calculatedTotal,
         paidAmount: typeof paidAmount === "number" ? paidAmount : 0,
-        currency: "USD",
-        notes: description.trim() || undefined,
-        items: [
-          {
-            description: `Shipping bill ${invoiceNumber.trim()} (${finalCars.length} vehicles)`,
-            amount: calculatedTotal,
-            quantity: 1,
-            unitPrice: calculatedTotal,
-          },
-        ],
+        billDate: shippingDate || new Date().toISOString().slice(0, 10),
+        description: description.trim() || invoiceNumber.trim(),
         allocations,
       };
 

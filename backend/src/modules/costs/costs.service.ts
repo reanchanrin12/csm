@@ -98,8 +98,27 @@ export class CostsService {
       throw new ConflictException(`Bill ${dto.billNumber} already exists.`);
     }
 
+    // Defensive handling for category & totalAmount
+    const validCategories = new Set(['TAX', 'CLEARANCE', 'TRANSPORT', 'CONTAINER', 'LABOR', 'REPAIR', 'ACCESSORY']);
+    let category: CostCategory = dto.category;
+    if (!validCategories.has(category as string)) {
+      category = 'TRANSPORT';
+    }
+
+    let totalAmount = Number(dto.totalAmount);
+    if (isNaN(totalAmount) || totalAmount === undefined) {
+      totalAmount = (dto.allocations || []).reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
+    }
+
+    const paidAmount = Number(dto.paidAmount) || 0;
+
+    let billDate = new Date(dto.billDate);
+    if (isNaN(billDate.getTime())) {
+      billDate = new Date();
+    }
+
     // Verify all VINs exist
-    const vins = dto.allocations.map((a) => a.vin);
+    const vins = (dto.allocations || []).map((a) => a.vin.trim());
     const vehicles = await this.prisma.vehicle.findMany({
       where: { vin: { in: vins } },
       select: { id: true, vin: true },
@@ -118,22 +137,27 @@ export class CostsService {
         data: {
           billNumber: dto.billNumber,
           supplierId: dto.supplierId,
-          category: dto.category,
-          totalAmount: dto.totalAmount,
-          paidAmount: dto.paidAmount || 0,
-          billDate: new Date(dto.billDate),
-          description: dto.description,
+          category,
+          totalAmount,
+          paidAmount,
+          billDate,
+          description: dto.description || (dto as any).notes,
         },
       });
 
       // Create individual cost items linked to each vehicle
-      for (const alloc of dto.allocations) {
-        const vehicleId = vinToIdMap.get(alloc.vin)!;
+      for (const alloc of dto.allocations || []) {
+        const vehicleId = vinToIdMap.get(alloc.vin.trim())!;
+        let costType = alloc.costType;
+        if (!validCategories.has(costType as string)) {
+          costType = category;
+        }
+
         await tx.vehicleCostItem.create({
           data: {
             vehicleId,
-            costType: alloc.costType || dto.category,
-            amount: alloc.amount,
+            costType: costType as CostCategory,
+            amount: Number(alloc.amount) || 0,
             billId: bill.id,
             note: alloc.note,
           },
@@ -252,11 +276,16 @@ export class CostsService {
             const vId = vinMap.get(alloc.vin);
             if (vId) {
               sum += Number(alloc.amount) || 0;
+              let costType = alloc.costType || bill.category;
+              const validCategories = new Set(['TAX', 'CLEARANCE', 'TRANSPORT', 'CONTAINER', 'LABOR', 'REPAIR', 'ACCESSORY']);
+              if (!validCategories.has(costType as string)) {
+                costType = bill.category;
+              }
               await tx.vehicleCostItem.create({
                 data: {
                   vehicleId: vId,
-                  costType: alloc.costType || bill.category,
-                  amount: alloc.amount,
+                  costType: costType as CostCategory,
+                  amount: Number(alloc.amount) || 0,
                   billId: id,
                   note: alloc.note,
                 },
