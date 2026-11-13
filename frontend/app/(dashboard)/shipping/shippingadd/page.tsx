@@ -226,6 +226,7 @@ export default function AddNewShippingFeePage() {
 
     // Reset row inputs
     setSelectedCarVin("");
+    setCarSearchQuery("");
     setInputTranFee("");
     setInputContainerFee("");
     setInputLaborFee("");
@@ -251,21 +252,48 @@ export default function AddNewShippingFeePage() {
       setErrorMessage("Invoice Number is required.");
       return;
     }
-    if (!transportCompanyId) {
-      setErrorMessage("Please select a transport company.");
+
+    // Auto-resolve transport company if typed or copy-pasted without clicking
+    let finalCompanyId = transportCompanyId;
+    if (!finalCompanyId && companySearchQuery.trim()) {
+      const exact = suppliers.find(
+        (s) =>
+          s.nameEn.toLowerCase() === companySearchQuery.trim().toLowerCase() ||
+          (s.nameKh && s.nameKh.toLowerCase() === companySearchQuery.trim().toLowerCase())
+      );
+      if (exact) {
+        finalCompanyId = exact.id;
+        setTransportCompanyId(exact.id);
+      }
+    }
+
+    if (!finalCompanyId) {
+      setErrorMessage("Please select a transport company from the list.");
       return;
     }
 
     let finalCars = [...addedCars];
 
     // If user filled row inputs but forgot to click "+ Add to list", auto-add it!
-    if (selectedCarVin) {
+    let activeVin = selectedCarVin;
+    if (!activeVin && carSearchQuery.trim()) {
+      const exactCar = vehicles.find(
+        (v) =>
+          v.vin.toLowerCase() === carSearchQuery.trim().toLowerCase() ||
+          `${v.brand} ${v.model} (${v.vin})`.toLowerCase() === carSearchQuery.trim().toLowerCase()
+      );
+      if (exactCar) {
+        activeVin = exactCar.vin;
+      }
+    }
+
+    if (activeVin) {
       const tFee = typeof inputTranFee === "number" ? inputTranFee : 0;
       const cFee = typeof inputContainerFee === "number" ? inputContainerFee : 0;
       const lFee = typeof inputLaborFee === "number" ? inputLaborFee : 0;
       if (tFee > 0 || cFee > 0 || lFee > 0) {
-        const matched = vehicles.find((v) => v.vin === selectedCarVin);
-        if (matched && !finalCars.some((c) => c.vin === selectedCarVin)) {
+        const matched = vehicles.find((v) => v.vin === activeVin);
+        if (matched && !finalCars.some((c) => c.vin === activeVin)) {
           finalCars.push({
             carId: matched.id,
             vin: matched.vin,
@@ -328,7 +356,7 @@ export default function AddNewShippingFeePage() {
 
       const dto = {
         billNumber: invoiceNumber.trim(),
-        supplierId: transportCompanyId,
+        supplierId: finalCompanyId,
         category: "TRANSPORT" as const,
         totalAmount: calculatedTotal,
         paidAmount: typeof paidAmount === "number" ? paidAmount : 0,

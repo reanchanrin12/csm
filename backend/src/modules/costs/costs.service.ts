@@ -307,15 +307,21 @@ export class CostsService {
 
           let sum = 0;
           if (dto.allocations.length > 0) {
-            const vins = Array.from(new Set(dto.allocations.map((a) => a.vin)));
+            const vins = Array.from(new Set(dto.allocations.map((a) => a.vin.trim())));
             const vehicles = await tx.vehicle.findMany({
-              where: { vin: { in: vins } },
+              where: {
+                OR: [
+                  { vin: { in: vins } },
+                  { vin: { in: vins.map((v) => v.toUpperCase()) } },
+                  { vin: { in: vins.map((v) => v.toLowerCase()) } },
+                ],
+              },
               select: { id: true, vin: true },
             });
-            const vinMap = new Map(vehicles.map((v) => [v.vin, v.id]));
+            const vinMap = new Map(vehicles.map((v) => [v.vin.toLowerCase(), v.id]));
 
             for (const alloc of dto.allocations) {
-              const vId = vinMap.get(alloc.vin);
+              const vId = vinMap.get(alloc.vin.trim().toLowerCase());
               if (vId) {
                 sum += Number(alloc.amount) || 0;
                 let costType = alloc.costType || bill.category;
