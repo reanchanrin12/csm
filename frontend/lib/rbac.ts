@@ -14,6 +14,7 @@ export const ROUTE_ROLE_RULES: RouteRoleRule[] = [
   { prefix: "/finance", allowedRoles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"] },
   { prefix: "/logistics", allowedRoles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "ACCOUNTANT"] },
   { prefix: "/shipping", allowedRoles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "ACCOUNTANT"] },
+  { prefix: "/tracking-shipping", allowedRoles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "ACCOUNTANT"] },
   { prefix: "/transfers", allowedRoles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "SALE"] },
   { prefix: "/reports/sales", allowedRoles: ["SUPER_ADMIN", "ADMIN", "SALE", "ACCOUNTANT"] },
   { prefix: "/reports/expenses", allowedRoles: ["SUPER_ADMIN", "ADMIN", "ACCOUNTANT"] },

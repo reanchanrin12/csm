@@ -127,7 +127,7 @@ const csmNavSections: NavSection[] = [
       },
       {
         name: "Tracking Shipping",
-        href: "/logistics",
+        href: "/tracking-shipping",
         icon: Truck,
         roles: ["SUPER_ADMIN", "ADMIN", "STOCK_CONTROLLER", "ACCOUNTANT"],
       },
