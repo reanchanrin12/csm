@@ -888,7 +888,24 @@ function LogisticsContent() {
     });
   };
 
-  const handleRemoveCarRow = (index: number) => {
+  const handleRemoveCarRow = async (index: number) => {
+    if (editCarRows.length === 1 && selectedBill) {
+      if (
+        confirm(
+          `Removing the only vehicle will delete this invoice "${selectedBill.billNumber}". Do you want to delete this invoice completely?`
+        )
+      ) {
+        try {
+          await costService.deleteBill(selectedBill.id);
+          setActionSuccess(`Invoice "${selectedBill.billNumber}" deleted successfully.`);
+          setSelectedBill(null);
+          await fetchData();
+        } catch (err: unknown) {
+          alert(err instanceof Error ? err.message : "Failed to delete invoice");
+        }
+        return;
+      }
+    }
     setEditCarRows((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -938,7 +955,7 @@ function LogisticsContent() {
         paidAmount: typeof editPaidAmount === "number" ? editPaidAmount : 0,
         description: editDescription || undefined,
         totalAmount: editTotalAmount,
-        allocations: allocations.length > 0 ? allocations : undefined,
+        allocations,
       });
       setActionSuccess(`Bill "${selectedBill.billNumber}" updated successfully.`);
       setSelectedBill(null);
@@ -1661,14 +1678,24 @@ function LogisticsContent() {
                               {b.supplierName}
                             </td>
                             <td className="py-2.5 px-3 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenBillDetails(b)}
-                                className="h-7 w-7 rounded border border-slate-300 hover:bg-slate-100 inline-flex items-center justify-center text-slate-600 cursor-pointer transition-colors shadow-2xs"
-                                title="View bill details"
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                              </button>
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenBillDetails(b)}
+                                  className="h-7 w-7 rounded border border-slate-300 hover:bg-slate-100 inline-flex items-center justify-center text-slate-600 cursor-pointer transition-colors shadow-2xs"
+                                  title="View and edit bill details"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteBill(b.id, b.billNumber)}
+                                  className="h-7 w-7 rounded bg-[#ea4335] hover:bg-[#d32f2f] text-white inline-flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                  title="Delete bill"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))
@@ -2564,24 +2591,51 @@ function LogisticsContent() {
                 </div>
               </div>
 
-              {/* Modal Footer: Close & Save changes */}
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+              {/* Modal Footer: Delete Invoice, Close & Save changes */}
+              <div className="flex items-center justify-between pt-3 border-t border-slate-200">
                 <button
                   type="button"
-                  onClick={() => setSelectedBill(null)}
-                  className="h-[32px] px-4 border border-[#dcdfe6] text-slate-700 hover:bg-slate-50 rounded-[2px] text-xs font-medium cursor-pointer"
+                  onClick={async () => {
+                    if (!selectedBill) return;
+                    if (
+                      confirm(
+                        `Are you sure you want to delete invoice "${selectedBill.billNumber}"? This will remove all associated fees from the vehicles.`
+                      )
+                    ) {
+                      try {
+                        await costService.deleteBill(selectedBill.id);
+                        setActionSuccess(`Invoice "${selectedBill.billNumber}" deleted successfully.`);
+                        setSelectedBill(null);
+                        await fetchData();
+                      } catch (err: unknown) {
+                        alert(err instanceof Error ? err.message : "Failed to delete invoice");
+                      }
+                    }
+                  }}
+                  className="h-[32px] px-3.5 bg-red-600 hover:bg-red-700 text-white rounded-[2px] text-xs font-semibold cursor-pointer flex items-center gap-1.5 shadow-2xs transition-colors"
                 >
-                  Close
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Delete Invoice</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={handleSaveBillChanges}
-                  disabled={billSaving}
-                  className="h-[32px] px-5 bg-[#1976d2] hover:bg-[#1565c0] text-white rounded-[2px] text-xs font-semibold cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-2xs"
-                >
-                  <Save className="h-3.5 w-3.5" />
-                  <span>{billSaving ? "Saving..." : "Save changes"}</span>
-                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBill(null)}
+                    className="h-[32px] px-4 border border-[#dcdfe6] text-slate-700 hover:bg-slate-50 rounded-[2px] text-xs font-medium cursor-pointer"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveBillChanges}
+                    disabled={billSaving}
+                    className="h-[32px] px-5 bg-[#1976d2] hover:bg-[#1565c0] text-white rounded-[2px] text-xs font-semibold cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-2xs"
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    <span>{billSaving ? "Saving..." : "Save changes"}</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
