@@ -18,6 +18,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { userService, ApiError } from "@/lib/api";
+import { ConfirmDeleteModal } from "@/components/ui/confirm-delete-modal";
 import type { UserSummary, UserRole } from "@csm/contracts";
 
 interface EmployeeOption {
@@ -175,14 +176,25 @@ export function UsersManagement() {
     }
   };
 
-  const handleDelete = async (user: UserSummary) => {
-    if (!confirm(`តើអ្នកពិតជាចង់លុប System User "${user.username}" មែនទេ?`)) return;
+  const [userToDelete, setUserToDelete] = useState<UserSummary | null>(null);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
+
+  const handleDelete = (user: UserSummary) => {
+    setUserToDelete(user);
+  };
+
+  const handleConfirmDeleteUser = async () => {
+    if (!userToDelete) return;
 
     try {
-      await userService.delete(user.id);
-      setUsers((prev) => prev.filter((u) => u.id !== user.id));
+      setIsDeletingUser(true);
+      await userService.delete(userToDelete.id);
+      setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id));
+      setUserToDelete(null);
     } catch (err: any) {
       alert(err?.message || "Failed to delete user.");
+    } finally {
+      setIsDeletingUser(false);
     }
   };
 
@@ -597,6 +609,19 @@ export function UsersManagement() {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete User Modal */}
+      <ConfirmDeleteModal
+        open={userToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setUserToDelete(null);
+        }}
+        itemName={userToDelete?.username}
+        title="Delete User"
+        description="Are you sure you want to delete this system user? This action cannot be undone."
+        loading={isDeletingUser}
+        onConfirm={handleConfirmDeleteUser}
+      />
     </div>
   );
 }

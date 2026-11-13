@@ -19,6 +19,7 @@ import {
 import { settingsService, customerService } from "@/lib/api";
 import { UsersManagement } from "@/components/users-management";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { ConfirmDeleteModal } from "@/components/ui/confirm-delete-modal";
 
 interface BranchItem {
   id: string;
@@ -289,13 +290,27 @@ function SettingsContent() {
   };
 
   // Handle Delete Brand
-  const handleDeleteBrand = async (brand: BrandItem) => {
-    if (!confirm(`Are you sure you want to delete brand "${brand.name}"?`)) return;
+  const [deleteBrandModalOpen, setDeleteBrandModalOpen] = useState(false);
+  const [deletingBrand, setDeletingBrand] = useState<BrandItem | null>(null);
+  const [deleteBrandLoading, setDeleteBrandLoading] = useState(false);
+
+  const handleDeleteBrand = (brand: BrandItem) => {
+    setDeletingBrand(brand);
+    setDeleteBrandModalOpen(true);
+  };
+
+  const handleConfirmDeleteBrand = async () => {
+    if (!deletingBrand) return;
+    setDeleteBrandLoading(true);
     try {
-      await settingsService.deleteBrand(brand.id);
+      await settingsService.deleteBrand(deletingBrand.id);
+      setDeleteBrandModalOpen(false);
+      setDeletingBrand(null);
       await fetchAll();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Failed to delete brand");
+    } finally {
+      setDeleteBrandLoading(false);
     }
   };
 

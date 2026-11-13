@@ -20,6 +20,7 @@ import {
   Settings,
 } from "lucide-react";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { ConfirmDeleteModal } from "@/components/ui/confirm-delete-modal";
 import {
   costService,
   settingsService,
@@ -496,21 +497,30 @@ export function RepairInfoView() {
     }
   };
 
-  // Delete repair bill or cost item
-  const handleDeleteRepairRecord = async (row: CarRepairedRow) => {
-    if (!confirm(`Are you sure you want to delete repair record for "${row.brandModel} (${row.vin})"?`)) {
-      return;
-    }
+  // Delete repair bill or cost item with ConfirmDeleteModal
+  const [repairRecordToDelete, setRepairRecordToDelete] = useState<CarRepairedRow | null>(null);
+  const [isDeletingRepairRecord, setIsDeletingRepairRecord] = useState(false);
+
+  const handleDeleteRepairRecord = (row: CarRepairedRow) => {
+    setRepairRecordToDelete(row);
+  };
+
+  const handleConfirmDeleteRepair = async () => {
+    if (!repairRecordToDelete) return;
     try {
-      await costService.deleteBill(row.billId);
+      setIsDeletingRepairRecord(true);
+      await costService.deleteBill(repairRecordToDelete.billId);
       setFeedback({
         type: "success",
         message: "Repair record deleted successfully!",
       });
       setViewingRepairRow(null);
+      setRepairRecordToDelete(null);
       await loadData();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Failed to delete repair record");
+    } finally {
+      setIsDeletingRepairRecord(false);
     }
   };
 
@@ -1444,6 +1454,23 @@ export function RepairInfoView() {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Repair Record Modal */}
+      <ConfirmDeleteModal
+        open={repairRecordToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setRepairRecordToDelete(null);
+        }}
+        itemName={
+          repairRecordToDelete
+            ? `${repairRecordToDelete.brandModel} (${repairRecordToDelete.vin})`
+            : undefined
+        }
+        title="Delete Repair Record"
+        description="Are you sure you want to delete this repair record? This action will remove the record and adjust the landed cost."
+        loading={isDeletingRepairRecord}
+        onConfirm={handleConfirmDeleteRepair}
+      />
     </div>
   );
 }

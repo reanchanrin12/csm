@@ -836,6 +836,38 @@ function LogisticsContent() {
 
   const [editCarRows, setEditCarRows] = useState<BillVehicleRow[]>([]);
 
+  // "Edit car info" sub-modal state (matching Screenshot media_1794535232469_d4e0e776.jpg)
+  const [editingCarIndex, setEditingCarIndex] = useState<number | null>(null);
+  const [carModalClearance, setCarModalClearance] = useState<number | "">(0);
+  const [carModalTax, setCarModalTax] = useState<number | "">(0);
+
+  const handleOpenEditCarModal = (index: number) => {
+    const row = editCarRows[index];
+    if (!row) return;
+    setEditingCarIndex(index);
+    setCarModalClearance(row.clearance);
+    setCarModalTax(row.taxPayment);
+  };
+
+  const handleSaveCarModal = () => {
+    if (editingCarIndex === null) return;
+    const clr = typeof carModalClearance === "number" ? carModalClearance : 0;
+    const tx = typeof carModalTax === "number" ? carModalTax : 0;
+    setEditCarRows((prev) => {
+      const next = [...prev];
+      const cur = next[editingCarIndex];
+      if (!cur) return prev;
+      next[editingCarIndex] = {
+        ...cur,
+        clearance: clr,
+        taxPayment: tx,
+        lineTotal: clr + tx,
+      };
+      return next;
+    });
+    setEditingCarIndex(null);
+  };
+
   // ── Open & Edit Bill Details Modal (Exact Reference Screenshot 1) ────
   const handleOpenBillDetails = (b: BillItem) => {
     setSelectedBill(b);
@@ -2564,58 +2596,23 @@ function LogisticsContent() {
                             <td className="py-2 px-2.5 font-mono text-slate-600">{v.year}</td>
                             <td className="py-2 px-2.5 text-slate-600 uppercase">{v.color}</td>
                             <td className="py-2 px-2.5 font-mono text-slate-800">
-                              {v.isEditing ? (
-                                <div className="relative">
-                                  <span className="absolute left-1.5 top-1 text-slate-400 text-[10px]">$</span>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={v.clearance}
-                                    onChange={(e) =>
-                                      handleUpdateCarRow(i, "clearance", parseFloat(e.target.value) || 0)
-                                    }
-                                    className="w-24 h-[24px] pl-4 pr-1 text-[11px] font-mono border border-[#409eff] rounded-[2px] bg-white text-slate-800 focus:outline-none"
-                                  />
-                                </div>
-                              ) : (
-                                `$${v.clearance.toLocaleString("en-US", { minimumFractionDigits: 2 })}`
-                              )}
+                              ${v.clearance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                             </td>
                             <td className="py-2 px-2.5 font-mono text-slate-800">
-                              {v.isEditing ? (
-                                <div className="relative">
-                                  <span className="absolute left-1.5 top-1 text-slate-400 text-[10px]">$</span>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={v.taxPayment}
-                                    onChange={(e) =>
-                                      handleUpdateCarRow(i, "taxPayment", parseFloat(e.target.value) || 0)
-                                    }
-                                    className="w-24 h-[24px] pl-4 pr-1 text-[11px] font-mono border border-[#409eff] rounded-[2px] bg-white text-slate-800 focus:outline-none"
-                                  />
-                                </div>
-                              ) : (
-                                `$${v.taxPayment.toLocaleString("en-US", { minimumFractionDigits: 2 })}`
-                              )}
+                              ${v.taxPayment.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                             </td>
                             <td className="py-2 px-2.5 font-mono font-bold text-slate-900">
                               ${v.lineTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                             </td>
                             <td className="py-2 px-2.5 text-center">
-                              <div className="flex items-center justify-center gap-1">
+                              <div className="flex items-center justify-center gap-1.5">
                                 <button
                                   type="button"
-                                  onClick={() => handleToggleCarEdit(i)}
-                                  className={cn(
-                                    "h-6 w-6 rounded inline-flex items-center justify-center cursor-pointer transition-colors shadow-2xs",
-                                    v.isEditing
-                                      ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                                      : "bg-[#1976d2] hover:bg-[#1565c0] text-white"
-                                  )}
-                                  title={v.isEditing ? "Done editing" : "Edit clearance / tax fees"}
+                                  onClick={() => handleOpenEditCarModal(i)}
+                                  className="h-6 w-6 bg-[#409eff] hover:bg-[#337ecc] text-white rounded-[2px] inline-flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                  title="Edit car info"
                                 >
-                                  {v.isEditing ? <Check className="h-3 w-3" /> : <Edit2 className="h-3 w-3" />}
+                                  <Edit2 className="h-3 w-3" />
                                 </button>
                                 <button
                                   type="button"
@@ -2682,6 +2679,87 @@ function LogisticsContent() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Sub-modal: Edit car info (Matching Screenshot media_1794535232469_d4e0e776.jpg) */}
+      {editingCarIndex !== null && editCarRows[editingCarIndex] && (
+        <Dialog
+          open={editingCarIndex !== null}
+          onOpenChange={(open) => {
+            if (!open) setEditingCarIndex(null);
+          }}
+        >
+          <DialogContent className="sm:max-w-[560px] max-w-[94vw] w-full p-0 overflow-hidden rounded-[4px] border border-slate-200 shadow-2xl">
+            {/* Header: Edit car info */}
+            <div className="bg-[#1976d2] text-white px-5 py-3 flex items-center justify-between">
+              <DialogTitle className="text-[14px] font-semibold tracking-wide text-white">
+                Edit car info
+              </DialogTitle>
+              <button
+                type="button"
+                onClick={() => setEditingCarIndex(null)}
+                className="text-white/80 hover:text-white cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 bg-white text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-slate-600">Choose car</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={editCarRows[editingCarIndex]?.vin || ""}
+                    className="w-full h-[32px] px-2.5 font-mono text-[11px] bg-slate-50 border border-[#dcdfe6] rounded-[2px] text-slate-700"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-slate-600">Clearance fee</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={carModalClearance}
+                    onChange={(e) =>
+                      setCarModalClearance(e.target.value === "" ? "" : parseFloat(e.target.value))
+                    }
+                    className="w-full h-[32px] px-2.5 font-mono text-xs border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-slate-600">Tax payment</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={carModalTax}
+                    onChange={(e) =>
+                      setCarModalTax(e.target.value === "" ? "" : parseFloat(e.target.value))
+                    }
+                    className="w-full h-[32px] px-2.5 font-mono text-xs border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingCarIndex(null)}
+                  className="h-[30px] px-4 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-[2px] cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveCarModal}
+                  className="h-[30px] px-5 bg-[#409eff] hover:bg-[#337ecc] text-white rounded-[2px] text-xs font-semibold cursor-pointer shadow-2xs"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Styled Confirmation Delete Modal */}
       <ConfirmDeleteModal

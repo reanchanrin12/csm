@@ -389,6 +389,42 @@ function ShippingContent() {
     return modalComputedTotal - paid;
   }, [modalComputedTotal, editPaidAmount]);
 
+  // "Edit car info" sub-modal state (matching exact reference screenshot)
+  const [editingCarIndex, setEditingCarIndex] = useState<number | null>(null);
+  const [carModalTranFee, setCarModalTranFee] = useState<number | "">(0);
+  const [carModalContainerFee, setCarModalContainerFee] = useState<number | "">(0);
+  const [carModalLaborFee, setCarModalLaborFee] = useState<number | "">(0);
+
+  const handleOpenEditCarModal = (index: number) => {
+    const row = editCarRows[index];
+    if (!row) return;
+    setEditingCarIndex(index);
+    setCarModalTranFee(row.tranFee);
+    setCarModalContainerFee(row.containerFee);
+    setCarModalLaborFee(row.laborFee);
+  };
+
+  const handleSaveCarModal = () => {
+    if (editingCarIndex === null) return;
+    const t = typeof carModalTranFee === "number" ? carModalTranFee : 0;
+    const c = typeof carModalContainerFee === "number" ? carModalContainerFee : 0;
+    const l = typeof carModalLaborFee === "number" ? carModalLaborFee : 0;
+    setEditCarRows((prev) => {
+      const next = [...prev];
+      const cur = next[editingCarIndex];
+      if (!cur) return prev;
+      next[editingCarIndex] = {
+        ...cur,
+        tranFee: t,
+        containerFee: c,
+        laborFee: l,
+        lineTotal: t + c + l,
+      };
+      return next;
+    });
+    setEditingCarIndex(null);
+  };
+
   const handleUpdateEditCarRow = (
     index: number,
     field: "tranFee" | "containerFee" | "laborFee",
@@ -1569,54 +1605,18 @@ function ShippingContent() {
                           <td className="p-2 text-slate-600">{row.color}</td>
 
                           {/* Tran fee */}
-                          <td className="p-2 text-right">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={row.tranFee}
-                              onChange={(e) =>
-                                handleUpdateEditCarRow(
-                                  idx,
-                                  "tranFee",
-                                  parseFloat(e.target.value) || 0
-                                )
-                              }
-                              className="w-24 h-[26px] px-1.5 text-right font-mono border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800"
-                            />
+                          <td className="p-2 text-right font-mono text-slate-800">
+                            ${row.tranFee.toFixed(2)}
                           </td>
 
                           {/* Container fee */}
-                          <td className="p-2 text-right">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={row.containerFee}
-                              onChange={(e) =>
-                                handleUpdateEditCarRow(
-                                  idx,
-                                  "containerFee",
-                                  parseFloat(e.target.value) || 0
-                                )
-                              }
-                              className="w-24 h-[26px] px-1.5 text-right font-mono border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800"
-                            />
+                          <td className="p-2 text-right font-mono text-slate-800">
+                            ${row.containerFee.toFixed(2)}
                           </td>
 
                           {/* Labor fee */}
-                          <td className="p-2 text-right">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={row.laborFee}
-                              onChange={(e) =>
-                                handleUpdateEditCarRow(
-                                  idx,
-                                  "laborFee",
-                                  parseFloat(e.target.value) || 0
-                                )
-                              }
-                              className="w-24 h-[26px] px-1.5 text-right font-mono border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800"
-                            />
+                          <td className="p-2 text-right font-mono text-slate-800">
+                            ${row.laborFee.toFixed(2)}
                           </td>
 
                           {/* Line Total */}
@@ -1626,14 +1626,24 @@ function ShippingContent() {
 
                           {/* Action */}
                           <td className="p-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveCarRow(idx)}
-                              className="h-6 w-6 bg-red-500 hover:bg-red-600 text-white rounded-[2px] flex items-center justify-center cursor-pointer mx-auto"
-                              title="Remove car from invoice"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditCarModal(idx)}
+                                className="h-6 w-6 bg-[#409eff] hover:bg-[#337ecc] text-white rounded-[2px] flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                title="Edit car info"
+                              >
+                                <Edit2 className="h-3 w-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveCarRow(idx)}
+                                className="h-6 w-6 bg-red-500 hover:bg-red-600 text-white rounded-[2px] flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                title="Remove car from invoice"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -1684,6 +1694,99 @@ function ShippingContent() {
                     <span>{billSaving ? "Saving..." : "Save changes"}</span>
                   </button>
                 </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Sub-modal: Edit car info (Matching Screenshot media_1794535232469_d4e0e776.jpg) */}
+      {editingCarIndex !== null && editCarRows[editingCarIndex] && (
+        <Dialog
+          open={editingCarIndex !== null}
+          onOpenChange={(open) => {
+            if (!open) setEditingCarIndex(null);
+          }}
+        >
+          <DialogContent className="sm:max-w-[620px] max-w-[94vw] w-full p-0 overflow-hidden rounded-[4px] border border-slate-200 shadow-2xl">
+            {/* Header: Edit car info */}
+            <div className="bg-[#1976d2] text-white px-5 py-3 flex items-center justify-between">
+              <DialogTitle className="text-[14px] font-semibold tracking-wide text-white">
+                Edit car info
+              </DialogTitle>
+              <button
+                type="button"
+                onClick={() => setEditingCarIndex(null)}
+                className="text-white/80 hover:text-white cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 bg-white text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-slate-600">Choose car</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={editCarRows[editingCarIndex]?.vin || ""}
+                    className="w-full h-[32px] px-2.5 font-mono text-[11px] bg-slate-50 border border-[#dcdfe6] rounded-[2px] text-slate-700"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-slate-600">Tran fee</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={carModalTranFee}
+                    onChange={(e) =>
+                      setCarModalTranFee(e.target.value === "" ? "" : parseFloat(e.target.value))
+                    }
+                    className="w-full h-[32px] px-2.5 font-mono text-xs border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-slate-600">Container fee</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={carModalContainerFee}
+                    onChange={(e) =>
+                      setCarModalContainerFee(e.target.value === "" ? "" : parseFloat(e.target.value))
+                    }
+                    className="w-full h-[32px] px-2.5 font-mono text-xs border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-slate-600">Labor fee</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={carModalLaborFee}
+                    onChange={(e) =>
+                      setCarModalLaborFee(e.target.value === "" ? "" : parseFloat(e.target.value))
+                    }
+                    className="w-full h-[32px] px-2.5 font-mono text-xs border border-[#dcdfe6] rounded-[2px] bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingCarIndex(null)}
+                  className="h-[30px] px-4 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-[2px] cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveCarModal}
+                  className="h-[30px] px-5 bg-[#409eff] hover:bg-[#337ecc] text-white rounded-[2px] text-xs font-semibold cursor-pointer shadow-2xs"
+                >
+                  Save
+                </button>
               </div>
             </div>
           </DialogContent>

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { employeeService } from "@/lib/api";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { ConfirmDeleteModal } from "@/components/ui/confirm-delete-modal";
 import type { EmployeeRole, SalaryPaymentSummary } from "@csm/contracts";
 
 interface Employee {
@@ -213,16 +214,29 @@ export default function EmployeesPage() {
     }
   };
 
+  // Delete Employee Confirmation State
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletingEmployee, setDeletingEmployee] = useState<{ id: string; name: string } | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   // Delete Employee
-  const handleDeleteEmployee = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to delete employee "${name}"?`)) {
-      return;
-    }
+  const handleDeleteEmployee = (id: string, name: string) => {
+    setDeletingEmployee({ id, name });
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDeleteEmployee = async () => {
+    if (!deletingEmployee) return;
+    setDeleteLoading(true);
     try {
-      await employeeService.delete(id);
+      await employeeService.delete(deletingEmployee.id);
+      setDeleteModalOpen(false);
+      setDeletingEmployee(null);
       await fetchData();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Failed to delete employee");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -891,6 +905,17 @@ export default function EmployeesPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Styled Confirmation Delete Modal */}
+      <ConfirmDeleteModal
+        open={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
+        title="Confirm Delete Employee"
+        itemName={deletingEmployee?.name}
+        description="Are you sure you want to delete this employee? This will remove the employee record from the system."
+        loading={deleteLoading}
+        onConfirm={handleConfirmDeleteEmployee}
+      />
     </div>
   );
 }
