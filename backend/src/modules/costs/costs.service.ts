@@ -145,17 +145,23 @@ export class CostsService {
         billDate = new Date();
       }
 
-      // Verify all VINs exist
+      // Verify all VINs exist (robust case-insensitive check)
       const vins = (dto.allocations || []).map((a) => a.vin.trim());
       const vehicles = await this.prisma.vehicle.findMany({
-        where: { vin: { in: vins } },
+        where: {
+          OR: [
+            { vin: { in: vins } },
+            { vin: { in: vins.map((v) => v.toUpperCase()) } },
+            { vin: { in: vins.map((v) => v.toLowerCase()) } },
+          ],
+        },
         select: { id: true, vin: true },
       });
 
-      const vinToIdMap = new Map(vehicles.map((v) => [v.vin, v.id]));
+      const vinToIdMap = new Map(vehicles.map((v) => [v.vin.toLowerCase(), v.id]));
       for (const vin of vins) {
-        if (!vinToIdMap.has(vin)) {
-          throw new NotFoundException(`Vehicle with VIN ${vin} not found in inventory.`);
+        if (!vinToIdMap.has(vin.toLowerCase())) {
+          throw new NotFoundException(`Vehicle with VIN "${vin}" not found in inventory.`);
         }
       }
 
@@ -175,7 +181,7 @@ export class CostsService {
 
         // Create individual cost items linked to each vehicle
         for (const alloc of dto.allocations || []) {
-          const vehicleId = vinToIdMap.get(alloc.vin.trim())!;
+          const vehicleId = vinToIdMap.get(alloc.vin.trim().toLowerCase())!;
           let costType = alloc.costType;
           if (!validCategories.has(costType as string)) {
             costType = category;

@@ -320,6 +320,12 @@ export default function AddNewShippingFeePage() {
         }
       }
 
+      if (allocations.length === 0) {
+        setErrorMessage("Please enter at least one fee (Transport, Container, or Labor fee) for the selected car(s).");
+        setSubmitting(false);
+        return;
+      }
+
       const dto = {
         billNumber: invoiceNumber.trim(),
         supplierId: transportCompanyId,
