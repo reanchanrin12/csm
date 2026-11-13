@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -10,19 +10,16 @@ import {
   CheckCircle2,
   X,
   ArrowLeft,
-  Ship,
+  ChevronDown,
+  Search,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   costService,
   settingsService,
   vehicleService,
   type LandedCostBillRecord,
 } from "@/lib/api";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 interface VehicleOption {
   id: string;
@@ -69,9 +66,16 @@ export default function AddNewShippingFeePage() {
     new Date().toISOString().slice(0, 10)
   );
   const [transportCompanyId, setTransportCompanyId] = useState("");
+  const [companySearchQuery, setCompanySearchQuery] = useState("");
+  const [isCompanyDropdownOpen, setIsCompanyDropdownOpen] = useState(false);
+  const companyDropdownRef = useRef<HTMLDivElement>(null);
 
   // Inline "Choose car" + fee inputs row
   const [selectedCarVin, setSelectedCarVin] = useState("");
+  const [carSearchQuery, setCarSearchQuery] = useState("");
+  const [isCarDropdownOpen, setIsCarDropdownOpen] = useState(false);
+  const carDropdownRef = useRef<HTMLDivElement>(null);
+
   const [inputTranFee, setInputTranFee] = useState<number | "">("");
   const [inputContainerFee, setInputContainerFee] = useState<number | "">("");
   const [inputLaborFee, setInputLaborFee] = useState<number | "">("");
@@ -88,10 +92,25 @@ export default function AddNewShippingFeePage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Quick-add Logistic Company Modal
-  const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
-  const [newCompanyName, setNewCompanyName] = useState("");
-  const [savingCompany, setSavingCompany] = useState(false);
+  // Close dropdowns on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        companyDropdownRef.current &&
+        !companyDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsCompanyDropdownOpen(false);
+      }
+      if (
+        carDropdownRef.current &&
+        !carDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsCarDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Load vehicles and suppliers
   useEffect(() => {
@@ -113,6 +132,32 @@ export default function AddNewShippingFeePage() {
     }
     loadData();
   }, []);
+
+  // Filtered transport companies (for searchable autocomplete)
+  const filteredSuppliers = useMemo(() => {
+    if (!companySearchQuery.trim()) return suppliers;
+    const q = companySearchQuery.toLowerCase();
+    return suppliers.filter(
+      (s) =>
+        s.nameEn.toLowerCase().includes(q) ||
+        (s.nameKh && s.nameKh.toLowerCase().includes(q))
+    );
+  }, [suppliers, companySearchQuery]);
+
+  // Filtered vehicles (for searchable autocomplete)
+  const filteredVehicles = useMemo(() => {
+    if (!carSearchQuery.trim()) return vehicles.slice(0, 50);
+    const q = carSearchQuery.toLowerCase();
+    return vehicles
+      .filter(
+        (v) =>
+          v.vin.toLowerCase().includes(q) ||
+          v.brand.toLowerCase().includes(q) ||
+          v.model.toLowerCase().includes(q) ||
+          v.displayName.toLowerCase().includes(q)
+      )
+      .slice(0, 50);
+  }, [vehicles, carSearchQuery]);
 
   // Compute Grand Total of Added Cars
   const grandTotal = useMemo(() => {
@@ -309,30 +354,6 @@ export default function AddNewShippingFeePage() {
     }
   };
 
-  // Quick create company
-  const handleCreateCompany = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCompanyName.trim()) return;
-    setSavingCompany(true);
-    try {
-      const created = (await settingsService.createSupplier({
-        nameEn: newCompanyName.trim(),
-        category: "LOGISTICS",
-      })) as { id: string; nameEn: string; nameKh?: string };
-      setSuppliers((prev) => [
-        ...prev,
-        { id: created.id, nameEn: created.nameEn, nameKh: created.nameKh },
-      ]);
-      setTransportCompanyId(created.id);
-      setIsCompanyModalOpen(false);
-      setNewCompanyName("");
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Failed to create company");
-    } finally {
-      setSavingCompany(false);
-    }
-  };
-
   return (
     <div className="space-y-4">
       {/* Top Banner Navigation */}
@@ -410,32 +431,64 @@ export default function AddNewShippingFeePage() {
               />
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1" ref={companyDropdownRef}>
               <label className="text-[12px] font-medium text-slate-700">
                 Transport company
               </label>
-              <div className="flex items-center gap-1.5">
-                <select
-                  required
-                  value={transportCompanyId}
-                  onChange={(e) => setTransportCompanyId(e.target.value)}
-                  className="flex-1 h-[32px] px-2.5 border border-[#dcdfe6] rounded-[2px] text-xs bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
-                >
-                  <option value="">--Select--</option>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.nameEn} {s.nameKh ? `(${s.nameKh})` : ""}
-                    </option>
-                  ))}
-                </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  required={!transportCompanyId}
+                  value={companySearchQuery}
+                  onFocus={() => setIsCompanyDropdownOpen(true)}
+                  onChange={(e) => {
+                    setCompanySearchQuery(e.target.value);
+                    setIsCompanyDropdownOpen(true);
+                    if (!e.target.value) setTransportCompanyId("");
+                  }}
+                  placeholder="--Select--"
+                  className="w-full h-[32px] px-2.5 pr-8 border border-[#dcdfe6] rounded-[2px] text-xs bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
+                />
                 <button
                   type="button"
-                  onClick={() => setIsCompanyModalOpen(true)}
-                  title="Add new logistic company"
-                  className="h-[32px] px-2.5 bg-[#409eff] hover:bg-[#337ecc] text-white rounded-[2px] cursor-pointer flex items-center justify-center shrink-0"
+                  onClick={() => setIsCompanyDropdownOpen((prev) => !prev)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
-                  <Plus className="h-4 w-4" />
+                  <ChevronDown className="h-3.5 w-3.5" />
                 </button>
+
+                {/* Autocomplete Dropdown */}
+                {isCompanyDropdownOpen && (
+                  <div className="absolute left-0 top-[34px] w-full max-h-56 overflow-y-auto bg-white border border-[#dcdfe6] shadow-lg rounded-[2px] z-50 py-1 text-xs">
+                    {filteredSuppliers.length === 0 ? (
+                      <div className="px-3 py-2 text-slate-400 italic">
+                        No company found
+                      </div>
+                    ) : (
+                      filteredSuppliers.map((s) => (
+                        <div
+                          key={s.id}
+                          onClick={() => {
+                            setTransportCompanyId(s.id);
+                            setCompanySearchQuery(s.nameEn);
+                            setIsCompanyDropdownOpen(false);
+                          }}
+                          className={cn(
+                            "px-3 py-1.5 cursor-pointer hover:bg-[#f0f7ff] text-slate-700 flex items-center justify-between",
+                            transportCompanyId === s.id && "bg-[#ecf5ff] text-[#409eff] font-medium"
+                          )}
+                        >
+                          <span>{s.nameEn}</span>
+                          {s.nameKh && (
+                            <span className="text-[11px] text-slate-400 ml-2">
+                              {s.nameKh}
+                            </span>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -443,22 +496,79 @@ export default function AddNewShippingFeePage() {
           {/* Row 2: Choose car | Transport fee | Container fee | Labor fee | + Add to list */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end text-xs">
             {/* Choose car */}
-            <div className="sm:col-span-4 space-y-1">
+            <div className="sm:col-span-4 space-y-1" ref={carDropdownRef}>
               <label className="text-[12px] font-medium text-slate-700">
                 Choose car
               </label>
-              <select
-                value={selectedCarVin}
-                onChange={(e) => setSelectedCarVin(e.target.value)}
-                className="w-full h-[32px] px-2 border border-[#dcdfe6] rounded-[2px] text-xs bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
-              >
-                <option value="">choose car</option>
-                {vehicles.map((v) => (
-                  <option key={v.id} value={v.vin}>
-                    {v.displayName}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={carSearchQuery}
+                  onFocus={() => setIsCarDropdownOpen(true)}
+                  onChange={(e) => {
+                    setCarSearchQuery(e.target.value);
+                    setIsCarDropdownOpen(true);
+                    if (!e.target.value) setSelectedCarVin("");
+                  }}
+                  placeholder="choose car"
+                  className="w-full h-[32px] px-2.5 pr-8 border border-[#dcdfe6] rounded-[2px] text-xs bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#409eff]"
+                />
+                {selectedCarVin ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCarVin("");
+                      setCarSearchQuery("");
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    title="Clear"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsCarDropdownOpen((prev) => !prev)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </button>
+                )}
+
+                {/* Autocomplete Dropdown */}
+                {isCarDropdownOpen && (
+                  <div className="absolute left-0 top-[34px] w-full max-h-60 overflow-y-auto bg-white border border-[#dcdfe6] shadow-lg rounded-[2px] z-50 py-1 text-xs">
+                    {filteredVehicles.length === 0 ? (
+                      <div className="px-3 py-2 text-slate-400 italic">
+                        No vehicle found
+                      </div>
+                    ) : (
+                      filteredVehicles.map((v) => (
+                        <div
+                          key={v.id}
+                          onClick={() => {
+                            setSelectedCarVin(v.vin);
+                            setCarSearchQuery(`${v.brand} ${v.model} (${v.vin})`);
+                            setIsCarDropdownOpen(false);
+                          }}
+                          className={cn(
+                            "px-3 py-1.5 cursor-pointer hover:bg-[#f0f7ff] text-slate-700 flex flex-col gap-0.5 border-b border-slate-50 last:border-b-0",
+                            selectedCarVin === v.vin && "bg-[#ecf5ff] text-[#409eff]"
+                          )}
+                        >
+                          <div className="flex items-center justify-between font-medium">
+                            <span>{v.brand} {v.model} ({v.madeYear})</span>
+                            <span className="text-[11px] text-slate-500">{v.color}</span>
+                          </div>
+                          <div className="font-mono text-[11px] text-slate-500">
+                            {v.vin}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Transport fee */}
@@ -690,57 +800,6 @@ export default function AddNewShippingFeePage() {
           </div>
         </form>
       </div>
-
-      {/* Quick Add Logistic Company Modal */}
-      <Dialog open={isCompanyModalOpen} onOpenChange={setIsCompanyModalOpen}>
-        <DialogContent className="sm:max-w-[420px] max-w-[95vw] w-full p-0 overflow-hidden rounded-[4px] border border-slate-200 shadow-2xl">
-          <div className="bg-[#102a4e] text-white px-5 py-3 flex items-center justify-between">
-            <DialogTitle className="text-[14px] font-semibold tracking-wide text-white">
-              Adding new logistic company
-            </DialogTitle>
-            <button
-              type="button"
-              onClick={() => setIsCompanyModalOpen(false)}
-              className="text-white/80 hover:text-white cursor-pointer"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          <form onSubmit={handleCreateCompany} className="p-5 space-y-4 bg-white text-xs">
-            <div className="space-y-1">
-              <label className="text-[12px] font-medium text-slate-700">
-                Company Name (English)
-              </label>
-              <input
-                type="text"
-                required
-                value={newCompanyName}
-                onChange={(e) => setNewCompanyName(e.target.value)}
-                placeholder="e.g. GUANGZHOU ZHONGHUI TRANS CO., LTD"
-                className="w-full h-[32px] px-2.5 border border-[#dcdfe6] rounded-[2px] text-xs bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setIsCompanyModalOpen(false)}
-                className="h-[30px] px-3.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded-[2px] cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={savingCompany}
-                className="h-[30px] px-4 bg-[#409eff] hover:bg-[#337ecc] text-white text-xs font-semibold rounded-[2px] cursor-pointer shadow-2xs disabled:opacity-50"
-              >
-                {savingCompany ? "Saving..." : "Save"}
-              </button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

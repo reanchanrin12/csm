@@ -801,32 +801,19 @@ function ShippingContent() {
                 <label className="text-[12px] font-medium text-slate-700">
                   Transport company
                 </label>
-                <div className="flex items-center gap-1.5">
-                  <select
-                    required
-                    value={transportCompanyId}
-                    onChange={(e) => setTransportCompanyId(e.target.value)}
-                    className="flex-1 h-[32px] px-2.5 border border-[#dcdfe6] rounded-[2px] text-xs bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
-                  >
-                    <option value="">-- Choose logistic company --</option>
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.nameEn} {s.nameKh ? `(${s.nameKh})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      resetCompanyForm();
-                      setIsCompanyDialogOpen(true);
-                    }}
-                    title="Add new logistic company"
-                    className="h-[32px] px-2 bg-[#409eff] hover:bg-[#337ecc] text-white rounded-[2px] cursor-pointer flex items-center justify-center shrink-0"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                </div>
+                <select
+                  required
+                  value={transportCompanyId}
+                  onChange={(e) => setTransportCompanyId(e.target.value)}
+                  className="w-full h-[32px] px-2.5 border border-[#dcdfe6] rounded-[2px] text-xs bg-white text-slate-800 focus:outline-none focus:border-[#409eff]"
+                >
+                  <option value="">-- Choose logistic company --</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.nameEn} {s.nameKh ? `(${s.nameKh})` : ""}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-1">
