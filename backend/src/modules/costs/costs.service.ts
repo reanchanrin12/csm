@@ -1,4 +1,11 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+  HttpException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CostCategory } from '@csm/contracts';
 
@@ -34,6 +41,8 @@ export interface UpdateBillDto {
 
 @Injectable()
 export class CostsService {
+  private readonly logger = new Logger(CostsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   // 0. Fetch options for Landed Cost Bills & Allocations
@@ -91,87 +100,113 @@ export class CostsService {
 
   // 1. Create a landed cost bill and allocate cost items to vehicles
   async createBill(dto: CreateBillDto) {
-    const existing = await this.prisma.landedCostBill.findUnique({
-      where: { billNumber: dto.billNumber },
-    });
-    if (existing) {
-      throw new ConflictException(`Bill ${dto.billNumber} already exists.`);
-    }
-
-    // Defensive handling for category & totalAmount
-    const validCategories = new Set(['TAX', 'CLEARANCE', 'TRANSPORT', 'CONTAINER', 'LABOR', 'REPAIR', 'ACCESSORY']);
-    let category: CostCategory = dto.category;
-    if (!validCategories.has(category as string)) {
-      category = 'TRANSPORT';
-    }
-
-    let totalAmount = Number(dto.totalAmount);
-    if (isNaN(totalAmount) || totalAmount === undefined) {
-      totalAmount = (dto.allocations || []).reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
-    }
-
-    const paidAmount = Number(dto.paidAmount) || 0;
-
-    let billDate = new Date(dto.billDate);
-    if (isNaN(billDate.getTime())) {
-      billDate = new Date();
-    }
-
-    // Verify all VINs exist
-    const vins = (dto.allocations || []).map((a) => a.vin.trim());
-    const vehicles = await this.prisma.vehicle.findMany({
-      where: { vin: { in: vins } },
-      select: { id: true, vin: true },
-    });
-
-    const vinToIdMap = new Map(vehicles.map((v) => [v.vin, v.id]));
-    for (const vin of vins) {
-      if (!vinToIdMap.has(vin)) {
-        throw new NotFoundException(`Vehicle with VIN ${vin} not found in inventory.`);
+    try {
+      if (!dto.billNumber || !dto.billNumber.trim()) {
+        throw new BadRequestException('Invoice/Bill number is required.');
       }
-    }
+      if (!dto.supplierId || !dto.supplierId.trim()) {
+        throw new BadRequestException('Supplier/Transport company is required.');
+      }
+      if (!dto.allocations || dto.allocations.length === 0) {
+        throw new BadRequestException('At least one vehicle fee allocation is required.');
+      }
 
-    // Create bill and cost items in transaction
-    return this.prisma.$transaction(async (tx) => {
-      const bill = await tx.landedCostBill.create({
-        data: {
-          billNumber: dto.billNumber,
-          supplierId: dto.supplierId,
-          category,
-          totalAmount,
-          paidAmount,
-          billDate,
-          description: dto.description || (dto as any).notes,
-        },
+      // Verify supplier exists
+      const supplier = await this.prisma.supplier.findUnique({
+        where: { id: dto.supplierId.trim() },
+      });
+      if (!supplier) {
+        throw new BadRequestException(`Supplier with ID ${dto.supplierId} not found.`);
+      }
+
+      const existing = await this.prisma.landedCostBill.findUnique({
+        where: { billNumber: dto.billNumber.trim() },
+      });
+      if (existing) {
+        throw new ConflictException(`Bill ${dto.billNumber.trim()} already exists.`);
+      }
+
+      // Defensive handling for category & totalAmount
+      const validCategories = new Set(['TAX', 'CLEARANCE', 'TRANSPORT', 'CONTAINER', 'LABOR', 'REPAIR', 'ACCESSORY']);
+      let category: CostCategory = dto.category;
+      if (!validCategories.has(category as string)) {
+        category = 'TRANSPORT';
+      }
+
+      let totalAmount = Number(dto.totalAmount);
+      if (isNaN(totalAmount) || totalAmount === undefined) {
+        totalAmount = (dto.allocations || []).reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
+      }
+
+      const paidAmount = Number(dto.paidAmount) || 0;
+
+      let billDate = new Date(dto.billDate);
+      if (isNaN(billDate.getTime())) {
+        billDate = new Date();
+      }
+
+      // Verify all VINs exist
+      const vins = (dto.allocations || []).map((a) => a.vin.trim());
+      const vehicles = await this.prisma.vehicle.findMany({
+        where: { vin: { in: vins } },
+        select: { id: true, vin: true },
       });
 
-      // Create individual cost items linked to each vehicle
-      for (const alloc of dto.allocations || []) {
-        const vehicleId = vinToIdMap.get(alloc.vin.trim())!;
-        let costType = alloc.costType;
-        if (!validCategories.has(costType as string)) {
-          costType = category;
+      const vinToIdMap = new Map(vehicles.map((v) => [v.vin, v.id]));
+      for (const vin of vins) {
+        if (!vinToIdMap.has(vin)) {
+          throw new NotFoundException(`Vehicle with VIN ${vin} not found in inventory.`);
         }
+      }
 
-        await tx.vehicleCostItem.create({
+      // Create bill and cost items in transaction
+      return await this.prisma.$transaction(async (tx) => {
+        const bill = await tx.landedCostBill.create({
           data: {
-            vehicleId,
-            costType: costType as CostCategory,
-            amount: Number(alloc.amount) || 0,
-            billId: bill.id,
-            note: alloc.note,
+            billNumber: dto.billNumber.trim(),
+            supplierId: dto.supplierId.trim(),
+            category,
+            totalAmount,
+            paidAmount,
+            billDate,
+            description: dto.description || (dto as any).notes,
           },
         });
-      }
 
-      return tx.landedCostBill.findUnique({
-        where: { id: bill.id },
-        include: {
-          supplier: true,
-          costItems: { include: { vehicle: true } },
-        },
+        // Create individual cost items linked to each vehicle
+        for (const alloc of dto.allocations || []) {
+          const vehicleId = vinToIdMap.get(alloc.vin.trim())!;
+          let costType = alloc.costType;
+          if (!validCategories.has(costType as string)) {
+            costType = category;
+          }
+
+          await tx.vehicleCostItem.create({
+            data: {
+              vehicleId,
+              costType: costType as CostCategory,
+              amount: Number(alloc.amount) || 0,
+              billId: bill.id,
+              note: alloc.note,
+            },
+          });
+        }
+
+        return tx.landedCostBill.findUnique({
+          where: { id: bill.id },
+          include: {
+            supplier: true,
+            costItems: { include: { vehicle: true } },
+          },
+        });
       });
-    });
+    } catch (err: any) {
+      if (err instanceof HttpException) {
+        throw err;
+      }
+      this.logger.error(`Error in createBill: ${err?.message}`, err?.stack);
+      throw new BadRequestException(err?.message || 'Failed to create landed cost bill.');
+    }
   }
 
   // 2. Get bills list filtered by category, VIN or billNumber
@@ -250,86 +285,110 @@ export class CostsService {
 
   // 2.1 Update bill
   async updateBill(id: string, dto: UpdateBillDto) {
-    return this.prisma.$transaction(async (tx) => {
-      const bill = await tx.landedCostBill.findUnique({
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const bill = await tx.landedCostBill.findUnique({
+          where: { id },
+          include: { costItems: true },
+        });
+        if (!bill) throw new NotFoundException('Bill not found');
+
+        let newTotal = dto.totalAmount !== undefined ? dto.totalAmount : Number(bill.totalAmount);
+
+        if (dto.allocations !== undefined) {
+          // Remove old cost items for this bill
+          await tx.vehicleCostItem.deleteMany({ where: { billId: id } });
+
+          let sum = 0;
+          if (dto.allocations.length > 0) {
+            const vins = Array.from(new Set(dto.allocations.map((a) => a.vin)));
+            const vehicles = await tx.vehicle.findMany({
+              where: { vin: { in: vins } },
+              select: { id: true, vin: true },
+            });
+            const vinMap = new Map(vehicles.map((v) => [v.vin, v.id]));
+
+            for (const alloc of dto.allocations) {
+              const vId = vinMap.get(alloc.vin);
+              if (vId) {
+                sum += Number(alloc.amount) || 0;
+                let costType = alloc.costType || bill.category;
+                const validCategories = new Set(['TAX', 'CLEARANCE', 'TRANSPORT', 'CONTAINER', 'LABOR', 'REPAIR', 'ACCESSORY']);
+                if (!validCategories.has(costType as string)) {
+                  costType = bill.category;
+                }
+                await tx.vehicleCostItem.create({
+                  data: {
+                    vehicleId: vId,
+                    costType: costType as CostCategory,
+                    amount: Number(alloc.amount) || 0,
+                    billId: id,
+                    note: alloc.note,
+                  },
+                });
+              }
+            }
+          }
+          if (dto.totalAmount === undefined) {
+            newTotal = sum;
+          }
+        }
+
+        const data: any = {};
+        if (dto.supplierId) data.supplierId = dto.supplierId;
+        if (dto.paidAmount !== undefined) data.paidAmount = dto.paidAmount;
+        if (dto.billDate) data.billDate = new Date(dto.billDate);
+        if (dto.description !== undefined) data.description = dto.description;
+        data.totalAmount = newTotal;
+
+        return tx.landedCostBill.update({
+          where: { id },
+          data,
+          include: {
+            supplier: true,
+            costItems: { include: { vehicle: true } },
+          },
+        });
+      });
+    } catch (err: any) {
+      if (err instanceof HttpException) {
+        throw err;
+      }
+      this.logger.error(`Error in updateBill (${id}): ${err?.message}`, err?.stack);
+      throw new BadRequestException(err?.message || 'Failed to update landed cost bill.');
+    }
+  }
+
+  async deleteBill(id: string) {
+    try {
+      const bill = await this.prisma.landedCostBill.findUnique({
         where: { id },
         include: { costItems: true },
       });
       if (!bill) throw new NotFoundException('Bill not found');
-
-      let newTotal = dto.totalAmount !== undefined ? dto.totalAmount : Number(bill.totalAmount);
-
-      if (dto.allocations !== undefined) {
-        // Remove old cost items for this bill
-        await tx.vehicleCostItem.deleteMany({ where: { billId: id } });
-
-        let sum = 0;
-        if (dto.allocations.length > 0) {
-          const vins = Array.from(new Set(dto.allocations.map((a) => a.vin)));
-          const vehicles = await tx.vehicle.findMany({
-            where: { vin: { in: vins } },
-            select: { id: true, vin: true },
-          });
-          const vinMap = new Map(vehicles.map((v) => [v.vin, v.id]));
-
-          for (const alloc of dto.allocations) {
-            const vId = vinMap.get(alloc.vin);
-            if (vId) {
-              sum += Number(alloc.amount) || 0;
-              let costType = alloc.costType || bill.category;
-              const validCategories = new Set(['TAX', 'CLEARANCE', 'TRANSPORT', 'CONTAINER', 'LABOR', 'REPAIR', 'ACCESSORY']);
-              if (!validCategories.has(costType as string)) {
-                costType = bill.category;
-              }
-              await tx.vehicleCostItem.create({
-                data: {
-                  vehicleId: vId,
-                  costType: costType as CostCategory,
-                  amount: Number(alloc.amount) || 0,
-                  billId: id,
-                  note: alloc.note,
-                },
-              });
-            }
-          }
-        }
-        if (dto.totalAmount === undefined) {
-          newTotal = sum;
-        }
+      await this.prisma.vehicleCostItem.deleteMany({ where: { billId: id } });
+      return await this.prisma.landedCostBill.delete({ where: { id } });
+    } catch (err: any) {
+      if (err instanceof HttpException) {
+        throw err;
       }
-
-      const data: any = {};
-      if (dto.supplierId) data.supplierId = dto.supplierId;
-      if (dto.paidAmount !== undefined) data.paidAmount = dto.paidAmount;
-      if (dto.billDate) data.billDate = new Date(dto.billDate);
-      if (dto.description !== undefined) data.description = dto.description;
-      data.totalAmount = newTotal;
-
-      return tx.landedCostBill.update({
-        where: { id },
-        data,
-        include: {
-          supplier: true,
-          costItems: { include: { vehicle: true } },
-        },
-      });
-    });
-  }
-
-  async deleteBill(id: string) {
-    const bill = await this.prisma.landedCostBill.findUnique({
-      where: { id },
-      include: { costItems: true },
-    });
-    if (!bill) throw new NotFoundException('Bill not found');
-    await this.prisma.vehicleCostItem.deleteMany({ where: { billId: id } });
-    return this.prisma.landedCostBill.delete({ where: { id } });
+      this.logger.error(`Error in deleteBill (${id}): ${err?.message}`, err?.stack);
+      throw new BadRequestException(err?.message || 'Failed to delete landed cost bill.');
+    }
   }
 
   async deleteCostItem(id: string) {
-    const item = await this.prisma.vehicleCostItem.findUnique({ where: { id } });
-    if (!item) throw new NotFoundException('Cost item not found');
-    return this.prisma.vehicleCostItem.delete({ where: { id } });
+    try {
+      const item = await this.prisma.vehicleCostItem.findUnique({ where: { id } });
+      if (!item) throw new NotFoundException('Cost item not found');
+      return await this.prisma.vehicleCostItem.delete({ where: { id } });
+    } catch (err: any) {
+      if (err instanceof HttpException) {
+        throw err;
+      }
+      this.logger.error(`Error in deleteCostItem (${id}): ${err?.message}`, err?.stack);
+      throw new BadRequestException(err?.message || 'Failed to delete cost item.');
+    }
   }
 
   // 3. Get landed cost breakdown for a specific vehicle by VIN
