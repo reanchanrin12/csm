@@ -1080,14 +1080,13 @@ function ShippingContent() {
             </h1>
 
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setViewMode("add-shipping")}
+              <Link
+                href="/shipping/shippingadd"
                 className="h-[30px] px-3.5 bg-[#409eff] hover:bg-[#337ecc] text-white rounded-[2px] text-xs font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer transition-colors"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span>New bill</span>
-              </button>
+              </Link>
               <button
                 type="button"
                 onClick={() => {

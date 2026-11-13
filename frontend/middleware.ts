@@ -70,14 +70,26 @@ export function middleware(request: NextRequest) {
   }
 
   const token = request.cookies.get("csm_token")?.value;
-  const user = token ? decodeJwtPayload(token) : null;
+  const refreshToken = request.cookies.get("csm_refresh_token")?.value;
+  let user = token ? decodeJwtPayload(token) : null;
+
+  // Fallback to refresh token if access token has expired
+  if (!user && refreshToken) {
+    user = decodeJwtPayload(refreshToken);
+  }
 
   // 2. Handle /login page
   if (pathname === "/login") {
     if (request.nextUrl.searchParams.has("logout")) {
       const response = NextResponse.next();
       response.cookies.delete("csm_token");
+      response.cookies.delete("csm_refresh_token");
       response.cookies.set("csm_token", "", {
+        path: "/",
+        expires: new Date(0),
+        maxAge: 0,
+      });
+      response.cookies.set("csm_refresh_token", "", {
         path: "/",
         expires: new Date(0),
         maxAge: 0,
@@ -101,6 +113,9 @@ export function middleware(request: NextRequest) {
     // Clear stale or expired cookie if it was present
     if (token) {
       response.cookies.delete("csm_token");
+    }
+    if (refreshToken) {
+      response.cookies.delete("csm_refresh_token");
     }
     return response;
   }

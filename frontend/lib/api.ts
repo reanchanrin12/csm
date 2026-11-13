@@ -42,6 +42,54 @@ export interface ApiError {
   statusCode?: number;
 }
 
+let activeRefreshPromise: Promise<string | null> | null = null;
+
+async function executeTokenRefresh(): Promise<string | null> {
+  if (activeRefreshPromise) {
+    return activeRefreshPromise;
+  }
+
+  activeRefreshPromise = (async () => {
+    try {
+      const storedToken = typeof window !== "undefined" ? localStorage.getItem("csm_token") : null;
+      const storedRefreshToken = typeof window !== "undefined" ? localStorage.getItem("csm_refresh_token") : null;
+
+      const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(storedToken ? { Authorization: `Bearer ${storedToken}` } : {}),
+          ...(storedRefreshToken ? { "x-refresh-token": storedRefreshToken } : {}),
+        },
+        body: JSON.stringify({ refreshToken: storedRefreshToken || undefined }),
+        credentials: "include",
+      });
+
+      if (!refreshRes.ok) return null;
+
+      const authData = await refreshRes.json();
+      if (!authData?.accessToken) return null;
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("csm_token", authData.accessToken);
+        document.cookie = `csm_token=${encodeURIComponent(authData.accessToken)}; path=/; max-age=604800; SameSite=Lax`;
+        if (authData.refreshToken) {
+          localStorage.setItem("csm_refresh_token", authData.refreshToken);
+          document.cookie = `csm_refresh_token=${encodeURIComponent(authData.refreshToken)}; path=/; max-age=2592000; SameSite=Lax`;
+        }
+      }
+
+      return authData.accessToken as string;
+    } catch {
+      return null;
+    } finally {
+      activeRefreshPromise = null;
+    }
+  })();
+
+  return activeRefreshPromise;
+}
+
 /** Typed fetch wrapper — throws ApiError on non-2xx */
 async function apiFetch<T>(
   path: string,
@@ -86,42 +134,28 @@ async function apiFetch<T>(
     }
 
     if (res.status === 401 && typeof window !== "undefined" && !path.includes("/auth/")) {
-      try {
-        const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
+      const freshToken = await executeTokenRefresh();
+      if (freshToken) {
+        // Retry the original request with the fresh token
+        const newHeaders = {
+          ...headers,
+          Authorization: `Bearer ${freshToken}`,
+        };
+        const retryRes = await fetch(`${API_BASE}${path}`, {
           credentials: "include",
+          ...options,
+          headers: newHeaders,
         });
-        if (refreshRes.ok) {
-          const authData = await refreshRes.json();
-          if (authData.accessToken) {
-            localStorage.setItem("csm_token", authData.accessToken);
-            document.cookie = `csm_token=${encodeURIComponent(authData.accessToken)}; path=/; max-age=604800; SameSite=Lax`;
-            // Retry the original request with the fresh token
-            const newHeaders = {
-              ...headers,
-              Authorization: `Bearer ${authData.accessToken}`,
-            };
-            const retryRes = await fetch(`${API_BASE}${path}`, {
-              credentials: "include",
-              ...options,
-              headers: newHeaders,
-            });
-            if (retryRes.ok) {
-              if (retryRes.status === 204) return undefined as T;
-              return retryRes.json() as Promise<T>;
-            }
-          }
+        if (retryRes.ok) {
+          if (retryRes.status === 204) return undefined as T;
+          return retryRes.json() as Promise<T>;
         }
-      } catch {
-        // Refresh failed, proceed to logout
       }
 
       localStorage.removeItem("csm_token");
+      localStorage.removeItem("csm_refresh_token");
       document.cookie = "csm_token=; path=/; max-age=0;";
+      document.cookie = "csm_refresh_token=; path=/; max-age=0;";
       if (!window.location.pathname.startsWith("/login")) {
         window.location.href = "/login?reason=expired";
       }
@@ -612,9 +646,10 @@ export const authService = {
       body: JSON.stringify(dto),
     }),
   getMe: () => apiFetch<AuthUser>("/auth/me"),
-  refreshToken: () =>
+  refreshToken: (refreshToken?: string) =>
     apiFetch<AuthResponse>("/auth/refresh", {
       method: "POST",
+      body: JSON.stringify({ refreshToken }),
     }),
   logout: () =>
     apiFetch<{ success: boolean; message: string }>("/auth/logout", {

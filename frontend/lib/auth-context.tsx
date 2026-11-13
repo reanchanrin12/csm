@@ -58,10 +58,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const interval = setInterval(async () => {
       try {
-        const res = await authService.refreshToken();
+        const storedRefreshToken = typeof window !== "undefined" ? localStorage.getItem("csm_refresh_token") : null;
+        const res = await authService.refreshToken(storedRefreshToken || undefined);
         if (res.accessToken) {
           localStorage.setItem("csm_token", res.accessToken);
           document.cookie = `csm_token=${encodeURIComponent(res.accessToken)}; path=/; max-age=604800; SameSite=Lax`;
+          if (res.refreshToken) {
+            localStorage.setItem("csm_refresh_token", res.refreshToken);
+            document.cookie = `csm_refresh_token=${encodeURIComponent(res.refreshToken)}; path=/; max-age=2592000; SameSite=Lax`;
+          }
           setUser(res.user);
         }
       } catch {
@@ -79,6 +84,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("csm_token", res.accessToken);
       // Ensure cookie is available for middleware
       document.cookie = `csm_token=${encodeURIComponent(res.accessToken)}; path=/; max-age=604800; SameSite=Lax`;
+      if (res.refreshToken) {
+        localStorage.setItem("csm_refresh_token", res.refreshToken);
+        document.cookie = `csm_refresh_token=${encodeURIComponent(res.refreshToken)}; path=/; max-age=2592000; SameSite=Lax`;
+      }
       setUser(res.user);
       router.replace("/");
     } finally {
@@ -93,8 +102,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Proceed even if network request fails
     } finally {
       localStorage.removeItem("csm_token");
+      localStorage.removeItem("csm_refresh_token");
       document.cookie = "csm_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; max-age=0; SameSite=Lax;";
       document.cookie = "csm_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; max-age=0;";
+      document.cookie = "csm_refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; max-age=0; SameSite=Lax;";
+      document.cookie = "csm_refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; max-age=0;";
       setUser(null);
       if (typeof window !== "undefined") {
         window.location.href = "/login?logout=true";

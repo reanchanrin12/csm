@@ -30,8 +30,14 @@ export type AuthUser = z.infer<typeof AuthUserSchema>;
 export const AuthResponseSchema = z.object({
   user: AuthUserSchema,
   accessToken: z.string(),
+  refreshToken: z.string().optional(),
 });
 export type AuthResponse = z.infer<typeof AuthResponseSchema>;
+
+export const RefreshTokenSchema = z.object({
+  refreshToken: z.string().optional(),
+});
+export type RefreshTokenDto = z.infer<typeof RefreshTokenSchema>;
 
 export const CreateUserSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters'),

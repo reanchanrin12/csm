@@ -11,6 +11,7 @@ import type { LoginDto, AuthResponse, AuthUser } from '@csm/contracts';
 @Injectable()
 export class AuthService {
   private readonly jwtSecret: string;
+  private readonly jwtRefreshSecret: string;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -19,6 +20,9 @@ export class AuthService {
     this.jwtSecret =
       this.configService.get<string>('JWT_SECRET') ||
       'csm-super-secret-key-automotive-voyah-2026';
+    this.jwtRefreshSecret =
+      this.configService.get<string>('JWT_REFRESH_SECRET') ||
+      `${this.jwtSecret}-csm-refresh-v1`;
   }
 
   hashPassword(password: string): string {
@@ -40,21 +44,32 @@ export class AuthService {
     }
   }
 
-  signJwt(payload: object, expiresInSeconds: number = 86400 * 7): string {
+  signJwt(payload: object, expiresInSeconds: number = 86400 * 7, customSecret?: string): string {
     const header = { alg: 'HS256', typ: 'JWT' };
     const exp = Math.floor(Date.now() / 1000) + expiresInSeconds;
     const fullPayload = { ...payload, exp };
 
     const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
     const encodedPayload = Buffer.from(JSON.stringify(fullPayload)).toString('base64url');
-    const signature = createHmac('sha256', this.jwtSecret)
+    const secret = customSecret || this.jwtSecret;
+    const signature = createHmac('sha256', secret)
       .update(`${encodedHeader}.${encodedPayload}`)
       .digest('base64url');
 
     return `${encodedHeader}.${encodedPayload}.${signature}`;
   }
 
-  verifyJwt<T extends object>(token: string): T {
+  signRefreshToken(authUser: AuthUser, expiresInSeconds: number = 86400 * 30): string {
+    const payload = {
+      id: authUser.id,
+      username: authUser.username,
+      role: authUser.role,
+      type: 'refresh',
+    };
+    return this.signJwt(payload, expiresInSeconds, this.jwtRefreshSecret);
+  }
+
+  verifyJwt<T extends object>(token: string, customSecret?: string): T {
     const parts = token.split('.');
     if (parts.length !== 3) {
       throw new UnauthorizedException('Invalid token format');
@@ -64,7 +79,8 @@ export class AuthService {
       throw new UnauthorizedException('Malformed token');
     }
 
-    const expectedSignature = createHmac('sha256', this.jwtSecret)
+    const secret = customSecret || this.jwtSecret;
+    const expectedSignature = createHmac('sha256', secret)
       .update(`${header}.${payload}`)
       .digest('base64url');
 
@@ -76,6 +92,42 @@ export class AuthService {
       const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
       if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) {
         throw new UnauthorizedException('Token has expired');
+      }
+      return decoded as T;
+    } catch {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+  }
+
+  /**
+   * Validates cryptographic signature and extracts payload even if expired,
+   * provided it expired within the grace period (e.g. 30 days).
+   */
+  verifyTokenAllowExpired<T extends object>(token: string, customSecret?: string): T {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      throw new UnauthorizedException('Invalid token format');
+    }
+    const [header, payload, signature] = parts;
+    if (!header || !payload || !signature) {
+      throw new UnauthorizedException('Malformed token');
+    }
+
+    const secret = customSecret || this.jwtSecret;
+    const expectedSignature = createHmac('sha256', secret)
+      .update(`${header}.${payload}`)
+      .digest('base64url');
+
+    if (signature !== expectedSignature) {
+      throw new UnauthorizedException('Invalid token signature');
+    }
+
+    try {
+      const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+      const now = Math.floor(Date.now() / 1000);
+      // Allow renewal if expired within 30 days grace window
+      if (decoded.exp && decoded.exp < now - 86400 * 30) {
+        throw new UnauthorizedException('Token expired beyond grace renewal period');
       }
       return decoded as T;
     } catch {
@@ -122,11 +174,13 @@ export class AuthService {
       branchName: user.employee?.branch?.name,
     };
 
-    const accessToken = this.signJwt(authUser);
+    const accessToken = this.signJwt(authUser, 86400 * 7);
+    const refreshToken = this.signRefreshToken(authUser, 86400 * 30);
 
     return {
       user: authUser,
       accessToken,
+      refreshToken,
     };
   }
 
@@ -159,9 +213,56 @@ export class AuthService {
     };
   }
 
-  async refreshToken(userId: string): Promise<AuthResponse> {
+  async refreshToken(tokenOrUserId: string): Promise<AuthResponse> {
+    let targetUserId = tokenOrUserId;
+
+    // If it contains a dot, it's a JWT token that needs parsing and verification
+    if (tokenOrUserId.includes('.')) {
+      let decodedPayload: { id?: string; sub?: string } | null = null;
+
+      // 1. Try verify with refresh secret (active unexpired refresh token)
+      try {
+        decodedPayload = this.verifyJwt<{ id?: string; sub?: string }>(
+          tokenOrUserId,
+          this.jwtRefreshSecret,
+        );
+      } catch {
+        // 2. Try verify with standard secret (active unexpired access token)
+        try {
+          decodedPayload = this.verifyJwt<{ id?: string; sub?: string }>(
+            tokenOrUserId,
+            this.jwtSecret,
+          );
+        } catch {
+          // 3. Try verify with refresh secret allowing expired within 30-day grace
+          try {
+            decodedPayload = this.verifyTokenAllowExpired<{ id?: string; sub?: string }>(
+              tokenOrUserId,
+              this.jwtRefreshSecret,
+            );
+          } catch {
+            // 4. Try verify with standard secret allowing expired within 30-day grace
+            try {
+              decodedPayload = this.verifyTokenAllowExpired<{ id?: string; sub?: string }>(
+                tokenOrUserId,
+                this.jwtSecret,
+              );
+            } catch {
+              throw new UnauthorizedException('Invalid or expired refresh token');
+            }
+          }
+        }
+      }
+
+      const extractedId = decodedPayload?.id || decodedPayload?.sub;
+      if (!extractedId) {
+        throw new UnauthorizedException('Token payload does not contain user identification');
+      }
+      targetUserId = extractedId;
+    }
+
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: targetUserId },
       include: {
         employee: {
           include: {
@@ -187,11 +288,13 @@ export class AuthService {
       branchName: user.employee?.branch?.name,
     };
 
-    const accessToken = this.signJwt(authUser);
+    const accessToken = this.signJwt(authUser, 86400 * 7);
+    const refreshToken = this.signRefreshToken(authUser, 86400 * 30);
 
     return {
       user: authUser,
       accessToken,
+      refreshToken,
     };
   }
 }
